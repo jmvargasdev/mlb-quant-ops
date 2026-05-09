@@ -1,0 +1,89 @@
+# Dependencies
+node_modules/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+auth.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Build outputs
+dist/
+build/
+coverage/
+frontend/dist/
+*.tsbuildinfo
+
+# Logs and runtime artifacts
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Temp and cache
+tmp/
+temp/
+.tmp/
+.cache/
+.parcel-cache/
+.vite/
+node_modules/.vite/
+
+# Databases and local state
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+
+# Playwright and browser artifacts
+playwright-report/
+test-results/
+blob-report/
+storageState.json
+
+# Screenshots and generated media
+screenshots/
+mlb_ops/screenshots/
+*.mp4
+
+# Generated operational artifacts
+mlb_ops/logs/
+mlb_ops/raw/
+mlb_ops/processed/
+mlb_ops/snapshots/
+mlb_ops/historical/
+mlb_ops/reports/*.md
+mlb_ops/reports/quant_reports/
+mlb_ops/reports/replay_reports/
+artifacts/
+
+# Local tooling state
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+.codex/
+.agents/
+
+# Nested local repos and vendor sandboxes
+design-md-repo/
+
+# Local exploratory assets and ad hoc exports
+daily_mlb_report.md
+mlb_matchups_today.csv
+mlb_matchups_today.json
+posts.json
+ejemplo.png
+google.png
+hackernews.png
+login_save.js
+market_test.js
+market_test.png
+playwright_wiki.png

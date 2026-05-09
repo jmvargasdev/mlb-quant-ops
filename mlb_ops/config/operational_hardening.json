@@ -1,0 +1,48 @@
+{
+  "staleness_threshold_minutes": 240,
+  "freshness_threshold_minutes": 30,
+  "expected_windows": [
+    "06:00_open",
+    "08:00_early",
+    "10:00_market",
+    "13:00_lineup_watch",
+    "lineup_confirm",
+    "60m_pregame",
+    "15m_pregame",
+    "close"
+  ],
+  "status_taxonomy": {
+    "on_schedule": {
+      "severity": "ok",
+      "description": "Operational schedule is aligned and current."
+    },
+    "ready_for_today": {
+      "severity": "ok",
+      "description": "Daily initialization is complete and usable."
+    },
+    "incomplete_timelines": {
+      "severity": "warning",
+      "description": "Timeline has missing capture windows but the system is not broken."
+    },
+    "next_window_pending": {
+      "severity": "info",
+      "description": "The next scheduled capture window has not occurred yet."
+    },
+    "stale_state": {
+      "severity": "warning",
+      "description": "Operational state is older than the freshness threshold."
+    },
+    "timeline_complete": {
+      "severity": "ok",
+      "description": "All target capture windows are present for the current day."
+    },
+    "degraded": {
+      "severity": "warning",
+      "description": "Pipeline ran but one or more supporting signals are incomplete."
+    },
+    "broken": {
+      "severity": "critical",
+      "description": "A required stage failed or the operational state is invalid."
+    }
+  }
+}

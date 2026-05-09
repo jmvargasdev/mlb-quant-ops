@@ -1,0 +1,37 @@
+{
+  "name": "operational_data",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dashboard:api": "node backend/server.js",
+    "dashboard:web": "vite",
+    "dashboard:build": "vite build",
+    "dashboard:preview": "vite preview",
+    "mlb:crons": "node mlb_ops/scripts/cron_status_report.js",
+    "mlb:collect": "node mlb_ops/scripts/collect_mlb_ops.js",
+    "mlb:score": "node mlb_ops/scripts/scoring_engine.js",
+    "mlb:snapshot": "node mlb_ops/scripts/intraday_snapshot_engine.js",
+    "mlb:temporal": "node mlb_ops/scripts/temporal_density_engine.js",
+    "mlb:replay": "node mlb_ops/scripts/replay_engine.js",
+    "mlb:clv": "node mlb_ops/scripts/clv_research_engine.js",
+    "mlb:research": "node mlb_ops/scripts/daily_research_pipeline.js",
+    "mlb:ops": "node mlb_ops/scripts/daily_operations_orchestrator.js",
+    "mlb:bootstrap": "node mlb_ops/scripts/daily_system_bootstrap.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.4",
+    "@vitejs/plugin-react": "^6.0.1",
+    "express": "^5.2.1",
+    "playwright": "^1.59.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "recharts": "^3.8.1",
+    "tailwindcss": "^4.2.4",
+    "vite": "^8.0.11"
+  }
+}
