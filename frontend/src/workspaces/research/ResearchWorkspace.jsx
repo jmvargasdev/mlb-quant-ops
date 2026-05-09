@@ -14,6 +14,7 @@ import { useResearchWorkspace } from './useResearchWorkspace';
 import VolatilitySection from './volatility/VolatilitySection';
 import { researchPct } from './shared/ui';
 import { useQuantReport } from './useQuantReport';
+import { apiPath } from '../../shared/lib/runtime';
 
 export default function ResearchWorkspace({ overview, status, active }) {
   const refreshMs = overview?.meta?.refresh_policy?.interval_ms || 120000;
@@ -59,7 +60,7 @@ export default function ResearchWorkspace({ overview, status, active }) {
             className="border border-sky-300/20 bg-[linear-gradient(135deg,rgba(113,199,255,0.12),rgba(7,16,24,0.96)_42%,rgba(61,220,151,0.08))]"
             action={(
               <a
-                href="/api/portal/quant-report/download"
+                href={apiPath('/api/portal/quant-report/download')}
                 className="rounded-2xl border border-sky-200/45 bg-sky-300/16 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_0_24px_rgba(113,199,255,0.12)] transition hover:border-sky-200/70 hover:bg-sky-300/22"
               >
                 Download Quant Report
@@ -150,7 +151,7 @@ export default function ResearchWorkspace({ overview, status, active }) {
               <div className="rounded-2xl border border-slate-700/35 bg-slate-950/45 px-4 py-3">
                 <div className="mono text-[11px] uppercase tracking-[0.22em] text-slate-500">Download</div>
                 <a
-                  href="/api/portal/quant-report/download"
+                  href={apiPath('/api/portal/quant-report/download')}
                   className="mt-2 inline-flex rounded-xl border border-sky-300/30 bg-sky-300/8 px-3 py-2 text-xs font-semibold text-sky-100 transition hover:border-sky-300/45"
                 >
                   Download Quant Report

@@ -1,4 +1,5 @@
 import { startTransition, useEffect, useState } from 'react';
+import { apiPath, getClientRefreshInterval } from '../../shared/lib/runtime';
 
 export function useResearchWorkspace(enabled, intervalMs = 120000) {
   const [data, setData] = useState(null);
@@ -23,7 +24,7 @@ export function useResearchWorkspace(enabled, intervalMs = 120000) {
       }));
 
       try {
-        const response = await fetch('/api/portal/research');
+        const response = await fetch(apiPath('/api/portal/research'));
         if (!response.ok) throw new Error(`Research request failed with ${response.status}`);
         const payload = await response.json();
         if (!active) return;
@@ -46,7 +47,7 @@ export function useResearchWorkspace(enabled, intervalMs = 120000) {
           refreshing: false,
           error: error.message,
         }));
-        timeoutId = window.setTimeout(() => loadResearch({ background: true }), Math.max(intervalMs, 120000));
+        timeoutId = window.setTimeout(() => loadResearch({ background: true }), Math.max(intervalMs, getClientRefreshInterval(120000)));
       }
     }
 

@@ -2,15 +2,20 @@ const { defineConfig } = require('vite');
 const react = require('@vitejs/plugin-react');
 const tailwindcss = require('@tailwindcss/vite').default;
 const path = require('path');
+const { getRuntimeConfig, validateRuntimeConfig } = require('./config');
+
+validateRuntimeConfig();
+const config = getRuntimeConfig();
+const backendOrigin = config.frontend.apiUrl || `http://localhost:${config.app.port}`;
 
 module.exports = defineConfig({
   root: path.resolve(__dirname, 'frontend'),
   plugins: [react(), tailwindcss()],
   server: {
-    port: 5173,
+    port: config.frontend.devPort,
     proxy: {
-      '/api': 'http://localhost:8787',
-      '/screenshots': 'http://localhost:8787',
+      '/api': backendOrigin,
+      '/screenshots': backendOrigin,
     },
   },
   build: {

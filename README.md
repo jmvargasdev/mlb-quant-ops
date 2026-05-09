@@ -74,9 +74,24 @@ MLB Quant Ops asks:
 - executive CIO allocation layer: live
 - deployment: not yet configured
 
+## Environment Configuration
+
+Copy the example environment file before running local services:
+
+```bash
+cp .env.example .env
+cp .env.local.example .env.local
+```
+
+The project now uses centralized runtime configuration and startup validation through `config/runtime.js`. See [docs/configuration.md](docs/configuration.md) for:
+
+- required and optional variables
+- local vs staging vs production guidance
+- Vercel, Railway, Render, and GitHub Actions readiness
+- secrets hygiene expectations
+
 ## Repository Intent
 
 This repository is being prepared as the institutional foundation for future private hosting and deployment. The immediate goal is version control hardening, documentation clarity, and infrastructure readiness without changing business logic.
 
 See [PROJECT_STATUS.md](PROJECT_STATUS.md) and [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md) for more detail.
-

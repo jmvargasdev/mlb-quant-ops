@@ -1,7 +1,8 @@
 import { startTransition, useEffect, useState } from 'react';
+import { apiPath, getClientRefreshInterval } from '../lib/runtime';
 
 function computeInterval(overview) {
-  return overview?.meta?.refresh_policy?.interval_ms ?? 120000;
+  return overview?.meta?.refresh_policy?.interval_ms ?? getClientRefreshInterval(120000);
 }
 
 export function usePortalOverview() {
@@ -27,7 +28,7 @@ export function usePortalOverview() {
       }));
 
       try {
-        const response = await fetch('/api/portal/overview');
+        const response = await fetch(apiPath('/api/portal/overview'));
         if (!response.ok) throw new Error(`Overview request failed with ${response.status}`);
         const payload = await response.json();
         if (!active) return;
@@ -53,7 +54,7 @@ export function usePortalOverview() {
           refreshing: false,
           error: error.message,
         }));
-        timeoutId = window.setTimeout(() => loadOverview({ background: true }), 120000);
+        timeoutId = window.setTimeout(() => loadOverview({ background: true }), getClientRefreshInterval(120000));
       }
     }
 

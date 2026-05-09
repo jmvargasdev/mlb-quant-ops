@@ -1,0 +1,70 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build-and-validate:
+    runs-on: ubuntu-latest
+    env:
+      PORT: "8787"
+      NODE_ENV: development
+      APP_ENV: ci
+      LOG_LEVEL: info
+      VITE_API_URL: ""
+      VITE_REFRESH_INTERVAL: "120000"
+      SNAPSHOT_INTERVAL_SECONDS: "75"
+      MARKET_REFRESH_POLICY: market_watch
+      ENABLE_RESEARCH_PIPELINES: "true"
+      ENABLE_CIO_LAYER: "true"
+      DATABASE_URL: ""
+      SQLITE_PATH: ./data/mlb-quant-ops.ci.sqlite
+      ARTIFACTS_PATH: ./mlb_ops
+      LOGS_PATH: ./mlb_ops/logs
+      MLB_STATS_API_BASE: https://statsapi.mlb.com/api/v1
+      BASEBALL_SAVANT_BASE: https://baseballsavant.mlb.com
+      ROTOWIRE_BASE: https://www.rotowire.com
+      COVERS_BASE: https://www.covers.com
+      OPEN_METEO_BASE: https://api.open-meteo.com/v1
+      PLAYWRIGHT_HEADLESS: "true"
+      PLAYWRIGHT_TIMEOUT: "30000"
+      PLAYWRIGHT_BROWSER: chromium
+      ENABLE_DECISION_PANEL: "true"
+      ENABLE_EXECUTIVE_MEMOS: "true"
+      ENABLE_PORTFOLIO_GOVERNANCE: "true"
+      ENABLE_TEMPORAL_RESEARCH: "true"
+      AUTO_DAILY_BOOTSTRAP: "0"
+      VITE_DEV_PORT: "5173"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate runtime configuration
+        run: node config/validate.js
+
+      - name: Build dashboard
+        run: npm run dashboard:build
+
+      - name: Secrets hygiene scan
+        run: |
+          if rg -n --hidden -S "(ghp_|github_pat_|BEGIN RSA|BEGIN OPENSSH|aws_access_key_id|aws_secret_access_key|x-api-key|authorization:|bearer |client_secret|session_token|refresh_token)" . \
+            -g '!node_modules/**' \
+            -g '!frontend/dist/**' \
+            -g '!.git/**'
+          then
+            echo "Potential secret-like material detected."
+            exit 1
+          fi
+

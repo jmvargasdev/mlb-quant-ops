@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "config:validate": "node config/validate.js",
     "dashboard:api": "node backend/server.js",
     "dashboard:web": "vite",
     "dashboard:build": "vite build",

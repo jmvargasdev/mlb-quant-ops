@@ -3,10 +3,13 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const portalRoutes = require('../api/portal-routes');
+const { getRuntimeConfig, validateRuntimeConfig } = require('../config');
 
-const ROOT = path.resolve(__dirname, '..');
+validateRuntimeConfig();
+const config = getRuntimeConfig();
+const ROOT = config.app.root;
 const app = express();
-const PORT = Number(process.env.PORT || 8787);
+const PORT = config.app.port;
 const DIST_DIR = path.join(ROOT, 'frontend', 'dist');
 const BOOTSTRAP_SCRIPT = path.join(ROOT, 'mlb_ops', 'scripts', 'daily_system_bootstrap.js');
 
@@ -22,7 +25,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/api/portal', portalRoutes);
-app.use('/screenshots', express.static(path.join(ROOT, 'mlb_ops', 'screenshots')));
+app.use('/screenshots', express.static(path.join(config.storage.artifactsPath, 'screenshots')));
 
 if (fs.existsSync(DIST_DIR)) {
   app.use(express.static(DIST_DIR));
@@ -37,7 +40,7 @@ if (fs.existsSync(DIST_DIR)) {
 
 app.listen(PORT, () => {
   console.log(`MLB Quant Ops API listening on http://localhost:${PORT}`);
-  if (process.env.AUTO_DAILY_BOOTSTRAP === '0') return;
+  if (!config.app.autoDailyBootstrap) return;
   const child = spawn('node', [BOOTSTRAP_SCRIPT], {
     cwd: ROOT,
     env: {

@@ -1,7 +1,8 @@
 import { startTransition, useEffect, useRef, useState } from 'react';
+import { apiPath, getClientRefreshInterval } from '../shared/lib/runtime';
 
 function computeInterval(overview) {
-  return overview?.meta?.refresh_policy?.interval_ms ?? 120000;
+  return overview?.meta?.refresh_policy?.interval_ms ?? getClientRefreshInterval(120000);
 }
 
 export function usePortalData() {
@@ -23,7 +24,7 @@ export function usePortalData() {
       }
 
       try {
-        const response = await fetch('/api/portal/overview');
+        const response = await fetch(apiPath('/api/portal/overview'));
         if (!response.ok) throw new Error(`Overview request failed with ${response.status}`);
         const payload = await response.json();
         if (!active) return;
@@ -56,7 +57,7 @@ export function usePortalData() {
         }));
         timeoutId = window.setTimeout(() => {
           loadOverview({ background: true });
-        }, 120000);
+        }, getClientRefreshInterval(120000));
       }
     }
 
@@ -73,7 +74,7 @@ export function usePortalData() {
     let active = true;
 
     async function loadGame() {
-      const response = await fetch(`/api/portal/games/${gameId}`);
+      const response = await fetch(apiPath(`/api/portal/games/${gameId}`));
       if (!response.ok) throw new Error(`Game request failed with ${response.status}`);
       const payload = await response.json();
       if (!active) return;

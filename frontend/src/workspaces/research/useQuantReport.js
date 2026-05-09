@@ -1,4 +1,5 @@
 import { startTransition, useEffect, useState } from 'react';
+import { apiPath, getClientRefreshInterval } from '../../shared/lib/runtime';
 
 export function useQuantReport(enabled, intervalMs = 120000) {
   const [report, setReport] = useState(null);
@@ -23,7 +24,7 @@ export function useQuantReport(enabled, intervalMs = 120000) {
       }));
 
       try {
-        const response = await fetch('/api/portal/quant-report');
+        const response = await fetch(apiPath('/api/portal/quant-report'));
         if (!response.ok) throw new Error(`Quant report request failed with ${response.status}`);
         const payload = await response.json();
         if (!active) return;
@@ -46,7 +47,7 @@ export function useQuantReport(enabled, intervalMs = 120000) {
           refreshing: false,
           error: error.message,
         }));
-        timeoutId = window.setTimeout(() => loadReport({ background: true }), Math.max(intervalMs, 120000));
+        timeoutId = window.setTimeout(() => loadReport({ background: true }), Math.max(intervalMs, getClientRefreshInterval(120000)));
       }
     }
 
