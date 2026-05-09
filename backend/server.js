@@ -27,6 +27,15 @@ app.use((req, res, next) => {
 app.use('/api/portal', portalRoutes);
 app.use('/screenshots', express.static(path.join(config.storage.artifactsPath, 'screenshots')));
 
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'mlb-quant-ops',
+    environment: config.app.appEnv,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 if (fs.existsSync(DIST_DIR)) {
   app.use(express.static(DIST_DIR));
   app.get(/^(?!\/api\/).*/, (req, res, next) => {

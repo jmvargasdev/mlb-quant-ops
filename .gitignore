@@ -71,6 +71,7 @@ Desktop.ini
 .vscode/
 .codex/
 .agents/
+.railway/
 
 # Nested local repos and vendor sandboxes
 design-md-repo/

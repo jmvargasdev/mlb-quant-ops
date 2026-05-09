@@ -1,0 +1,29 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "RAILPACK",
+    "buildCommand": "npm ci && npm run dashboard:build",
+    "watchPatterns": [
+      "/api/**",
+      "/backend/**",
+      "/config/**",
+      "/frontend/**",
+      "/mlb_ops/scripts/**",
+      "/mlb_ops/config/**",
+      "/package.json",
+      "/package-lock.json",
+      "/vite.config.js",
+      "/railway.json"
+    ]
+  },
+  "deploy": {
+    "startCommand": "npm run start",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 300,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10,
+    "overlapSeconds": 0,
+    "drainingSeconds": 30
+  }
+}
+
