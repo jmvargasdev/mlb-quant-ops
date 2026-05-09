@@ -36,6 +36,10 @@ const SCHEMA = {
 
 let cachedConfig = null;
 
+function hasExplicitEnv(key) {
+  return process.env[key] !== undefined;
+}
+
 function parseEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return {};
   const lines = fs.readFileSync(filePath, 'utf8').split('\n');
@@ -105,9 +109,17 @@ function validateAndBuildConfig() {
   loadEnvFiles();
   const errors = [];
   const values = {};
+  const inferredNodeEnv = process.env.NODE_ENV !== undefined ? String(process.env.NODE_ENV).trim() : SCHEMA.NODE_ENV.default;
 
   for (const [key, rule] of Object.entries(SCHEMA)) {
-    const raw = process.env[key] !== undefined ? process.env[key] : rule.default;
+    let raw;
+    if (hasExplicitEnv(key)) {
+      raw = process.env[key];
+    } else if (key === 'AUTO_DAILY_BOOTSTRAP' && inferredNodeEnv === 'production') {
+      raw = false;
+    } else {
+      raw = rule.default;
+    }
     try {
       values[key] = coerceValue(key, raw, rule);
     } catch (error) {
@@ -195,4 +207,3 @@ module.exports = {
   getRuntimeConfig,
   validateRuntimeConfig,
 };
-
