@@ -3,6 +3,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { appendDailyEvent, writeDailyRunRecord } = require('./ops_history');
 const { buildOperationalChecklist } = require('./lib/operational-hardening');
+const { buildExecutionPlan } = require('./lib/execution-plan');
 
 const OPS_ROOT = path.resolve(__dirname, '..');
 const PROCESSED_DIR = path.join(OPS_ROOT, 'processed');
@@ -26,6 +27,7 @@ const CHECKLIST_PATH = path.join(PROCESSED_DIR, 'operational_checklist.json');
 const OPERATIONS_STATUS_PATH = path.join(PROCESSED_DIR, 'daily_operations_status.json');
 const DAILY_REPORT_PATH = path.join(REPORTS_DIR, 'daily_operations_report.md');
 const OPS_LOG_DIR = path.join(LOGS_DIR, 'daily_operations');
+const EXECUTION_PLAN_PATH = path.join(PROCESSED_DIR, 'daily_execution_plan.json');
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -91,8 +93,11 @@ function buildAutoLabel(nowIso, latest) {
 }
 
 function runNodeScript(scriptName, extraEnv = {}) {
+  const scriptPath = scriptName.includes(path.sep)
+    ? path.resolve(OPS_ROOT, '..', scriptName)
+    : path.join(OPS_ROOT, 'scripts', scriptName);
   const startedAt = new Date();
-  const result = spawnSync('node', [path.join(OPS_ROOT, 'scripts', scriptName)], {
+  const result = spawnSync('node', [scriptPath], {
     cwd: path.resolve(OPS_ROOT, '..'),
     env: {
       ...process.env,
@@ -167,6 +172,12 @@ function buildStagePlan(snapshotLabel) {
     {
       name: 'clv_research',
       script: 'clv_research_engine.js',
+      enabled: true,
+      env: {},
+    },
+    {
+      name: 'contract_validation',
+      script: 'contracts/validate.js',
       enabled: true,
       env: {},
     },
@@ -524,6 +535,12 @@ function main() {
       schedule_timing: scheduleTiming,
     },
     stage_results: stageResults,
+    execution_plan: buildExecutionPlan({
+      date: DATE,
+      snapshotLabel,
+      generatedAt,
+      stageResults,
+    }),
     operational_health: {
       ...operationalHealth,
       timeline_progress: timelineProgress,
@@ -572,6 +589,7 @@ function main() {
   ensureDir(OPS_LOG_DIR);
   const logPath = path.join(OPS_LOG_DIR, `${DATE}_${snapshotLabel}_operations.json`);
   writeJson(OPERATIONS_STATUS_PATH, status);
+  writeJson(EXECUTION_PLAN_PATH, status.execution_plan);
   writeJson(logPath, status);
   writeJson(CHECKLIST_PATH, checklist);
   writeText(DAILY_REPORT_PATH, buildReport(status, latest, temporal, edgeValidation, clvResearch));
@@ -580,6 +598,7 @@ function main() {
     ops_mode: OPS_MODE,
     snapshot_label: snapshotLabel,
     status,
+    execution_plan: status.execution_plan,
     stage_results: stageResults,
     operational_health: operationalHealth,
     operational_checklist: checklist,
@@ -594,6 +613,7 @@ function main() {
   console.log(JSON.stringify({
     outputs: [
       path.relative(process.cwd(), OPERATIONS_STATUS_PATH),
+      path.relative(process.cwd(), EXECUTION_PLAN_PATH),
       path.relative(process.cwd(), logPath),
       path.relative(process.cwd(), DAILY_REPORT_PATH),
     ],

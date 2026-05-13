@@ -2198,6 +2198,7 @@ function rawArtifact(name) {
     ['clv_preparation', path.join(PROCESSED_DIR, 'clv_preparation.json')],
     ['market_timeline', path.join(PROCESSED_DIR, 'market_timeline.json')],
     ['daily_operations_status', path.join(PROCESSED_DIR, 'daily_operations_status.json')],
+    ['daily_execution_plan', path.join(PROCESSED_DIR, 'daily_execution_plan.json')],
     ['edge_validation', path.join(PROCESSED_DIR, 'edge_validation.json')],
     ['clv_research', path.join(PROCESSED_DIR, 'clv_research.json')],
     ['persistence_research', path.join(PROCESSED_DIR, 'persistence_research.json')],
