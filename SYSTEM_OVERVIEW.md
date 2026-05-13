@@ -4,6 +4,8 @@
 
 MLB Quant Ops is a multi-layer market intelligence system that governs exposure rather than chasing isolated predictions.
 
+For the historical rationale, model chronology, Playwright origin, and epistemic basis of `Primary Allocation`, see [Model Rationale and Epistemology](docs/architecture/model-rationale-and-epistemology.md).
+
 ## System Layers
 
 ### 1. Sabermetrics Layer
