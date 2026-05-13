@@ -181,6 +181,12 @@ function buildStagePlan(snapshotLabel) {
       enabled: true,
       env: {},
     },
+    {
+      name: 'outcome_attribution',
+      script: 'outcome_attribution_engine.js',
+      enabled: true,
+      env: {},
+    },
   ];
 }
 

@@ -89,6 +89,20 @@ const EXECUTION_STEPS = [
     output_artifacts: ['mlb_ops/historical/decision_ledger/{date}.jsonl'],
     retryable: false,
   },
+  {
+    name: 'outcome_attribution',
+    stage_name: 'outcome_attribution',
+    framework_reference: ['Event Sourcing projection', 'ML evaluation / backtesting loop'],
+    input_artifacts: [
+      'mlb_ops/historical/decision_ledger/{date}.jsonl',
+      'mlb_ops/raw/{date}/*/schedule.json',
+    ],
+    output_artifacts: [
+      'mlb_ops/historical/outcome_attribution/{date}.jsonl',
+      'mlb_ops/processed/outcome_attribution.json',
+    ],
+    retryable: true,
+  },
 ];
 
 function materializeTemplate(value, context) {

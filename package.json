@@ -18,6 +18,7 @@
     "mlb:temporal": "node mlb_ops/scripts/temporal_density_engine.js",
     "mlb:replay": "node mlb_ops/scripts/replay_engine.js",
     "mlb:clv": "node mlb_ops/scripts/clv_research_engine.js",
+    "mlb:outcomes": "node mlb_ops/scripts/outcome_attribution_engine.js",
     "mlb:research": "node mlb_ops/scripts/daily_research_pipeline.js",
     "mlb:ops": "node mlb_ops/scripts/daily_operations_orchestrator.js",
     "mlb:bootstrap": "node mlb_ops/scripts/daily_system_bootstrap.js"
