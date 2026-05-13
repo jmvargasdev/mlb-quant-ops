@@ -69,6 +69,14 @@ The system should adopt the patterns without prematurely depending on a large ex
 
 ### Phase 1: Decision Ledger
 
+Framework / pattern reference:
+
+```text
+Event Sourcing
+Temporal history model
+Dagster asset lineage mindset
+```
+
 Create an append-only record of each executive allocation decision.
 
 Suggested path:
@@ -115,6 +123,15 @@ Purpose:
 
 ### Phase 2: Contract Validation
 
+Framework / pattern reference:
+
+```text
+Pydantic
+JSON Schema
+AJV
+Contract-first API design
+```
+
 Add contract-first validation for critical artifacts.
 
 Recommended tools:
@@ -150,6 +167,14 @@ Purpose:
 
 ### Phase 3: Policy Gates
 
+Framework / pattern reference:
+
+```text
+OPA
+Policy-as-code
+Approval gate pattern
+```
+
 Centralize capital governance rules.
 
 Candidate policies:
@@ -184,6 +209,14 @@ Purpose:
 
 ### Phase 4: Decision Graph
 
+Framework / pattern reference:
+
+```text
+LangGraph
+ReAct trace discipline
+Stateful decision graph pattern
+```
+
 Refactor the CIO decision process into explicit nodes.
 
 Suggested graph:
@@ -216,6 +249,15 @@ Purpose:
 - clarify why raw edge does not equal deployment
 
 ### Phase 5: Plan-And-Execute Pipeline
+
+Framework / pattern reference:
+
+```text
+Plan-and-Execute
+Temporal workflow semantics
+Prefect orchestration model
+Dagster pipeline observability
+```
 
 Add an explicit execution plan for daily operations.
 
@@ -255,6 +297,14 @@ Purpose:
 
 ### Phase 6: Outcome Attribution
 
+Framework / pattern reference:
+
+```text
+Event Sourcing projection
+Dagster materialized asset mindset
+ML evaluation / backtesting loop
+```
+
 Close the learning loop after games and market close.
 
 Attach outcomes to previous ledger rows:
@@ -285,6 +335,14 @@ Purpose:
 
 ### Phase 7: Policy Feedback
 
+Framework / pattern reference:
+
+```text
+OPA policy review loop
+ReAct verify step
+Human-in-the-loop governance
+```
+
 Generate reports that suggest rule or threshold adjustments.
 
 Suggested output:
@@ -309,6 +367,14 @@ Purpose:
 - make learning explicit
 
 ### Phase 8: Learning Observability
+
+Framework / pattern reference:
+
+```text
+Dagster observability
+Prefect run visibility
+Semantic Kernel plugin boundary for future integrations
+```
 
 Expose decision-learning quality in reports or frontend views.
 
