@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useRef, useState } from 'react';
-import { apiPath, getClientRefreshInterval } from '../shared/lib/runtime';
+import { getClientRefreshInterval, uncachedApiPath } from '../shared/lib/runtime';
 
 function computeInterval(overview) {
   return overview?.meta?.refresh_policy?.interval_ms ?? getClientRefreshInterval(120000);
@@ -24,7 +24,9 @@ export function usePortalData() {
       }
 
       try {
-        const response = await fetch(apiPath('/api/portal/overview'));
+        const response = await fetch(uncachedApiPath('/api/portal/overview'), {
+          cache: 'no-store',
+        });
         if (!response.ok) throw new Error(`Overview request failed with ${response.status}`);
         const payload = await response.json();
         if (!active) return;
@@ -74,7 +76,9 @@ export function usePortalData() {
     let active = true;
 
     async function loadGame() {
-      const response = await fetch(apiPath(`/api/portal/games/${gameId}`));
+      const response = await fetch(uncachedApiPath(`/api/portal/games/${gameId}`), {
+        cache: 'no-store',
+      });
       if (!response.ok) throw new Error(`Game request failed with ${response.status}`);
       const payload = await response.json();
       if (!active) return;

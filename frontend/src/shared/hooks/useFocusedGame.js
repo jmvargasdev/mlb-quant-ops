@@ -1,4 +1,5 @@
 import { startTransition, useEffect, useState } from 'react';
+import { uncachedApiPath } from '../lib/runtime';
 
 export function useFocusedGame(gameId, overviewSignature) {
   const [detail, setDetail] = useState(null);
@@ -9,7 +10,9 @@ export function useFocusedGame(gameId, overviewSignature) {
     let active = true;
 
     async function loadGame() {
-      const response = await fetch(`/api/portal/games/${gameId}`);
+      const response = await fetch(uncachedApiPath(`/api/portal/games/${gameId}`), {
+        cache: 'no-store',
+      });
       if (!response.ok) throw new Error(`Game request failed with ${response.status}`);
       const payload = await response.json();
       if (!active) return;

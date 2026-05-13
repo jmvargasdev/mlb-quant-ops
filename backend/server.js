@@ -1,9 +1,9 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
 const portalRoutes = require('../api/portal-routes');
 const { getRuntimeConfig, validateRuntimeConfig } = require('../config');
+const { startBootstrapScheduler } = require('./bootstrap-scheduler');
 
 validateRuntimeConfig();
 const config = getRuntimeConfig();
@@ -12,11 +12,18 @@ const app = express();
 const PORT = config.app.port;
 const DIST_DIR = path.join(ROOT, 'frontend', 'dist');
 const BOOTSTRAP_SCRIPT = path.join(ROOT, 'mlb_ops', 'scripts', 'daily_system_bootstrap.js');
+let bootstrapScheduler = null;
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.path.startsWith('/api/')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+  }
   if (req.method === 'OPTIONS') {
     res.status(204).end();
     return;
@@ -33,6 +40,7 @@ app.get('/health', (req, res) => {
     service: 'mlb-quant-ops',
     environment: config.app.appEnv,
     timestamp: new Date().toISOString(),
+    bootstrap_scheduler: bootstrapScheduler?.status?.() || null,
   });
 });
 
@@ -50,25 +58,10 @@ if (fs.existsSync(DIST_DIR)) {
 app.listen(PORT, () => {
   console.log(`MLB Quant Ops API listening on http://localhost:${PORT}`);
   if (!config.app.autoDailyBootstrap) return;
-  const child = spawn('node', [BOOTSTRAP_SCRIPT], {
-    cwd: ROOT,
-    env: {
-      ...process.env,
-      AUTO_DAILY_BOOTSTRAP: '1',
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-
-  child.stdout.on('data', (chunk) => {
-    process.stdout.write(`[bootstrap] ${chunk}`);
-  });
-  child.stderr.on('data', (chunk) => {
-    process.stderr.write(`[bootstrap] ${chunk}`);
-  });
-  child.on('exit', (code) => {
-    console.log(`MLB daily bootstrap finished with code ${code}`);
-  });
-  child.on('error', (error) => {
-    console.error(`MLB daily bootstrap failed to start: ${error.message}`);
+  bootstrapScheduler = startBootstrapScheduler({
+    root: ROOT,
+    scriptPath: BOOTSTRAP_SCRIPT,
+    intervalMinutes: config.app.autoBootstrapIntervalMinutes,
+    force: config.app.autoBootstrapForce,
   });
 });

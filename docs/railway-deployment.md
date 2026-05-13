@@ -138,11 +138,15 @@ ENABLE_EXECUTIVE_MEMOS=true
 ENABLE_PORTFOLIO_GOVERNANCE=true
 ENABLE_TEMPORAL_RESEARCH=true
 AUTO_DAILY_BOOTSTRAP=0
+AUTO_BOOTSTRAP_INTERVAL_MINUTES=15
+AUTO_BOOTSTRAP_FORCE=1
 ```
 
 ### Why `AUTO_DAILY_BOOTSTRAP=0`
 
 For first hosted release, bootstrap should be controlled intentionally, not automatically at every container start.
+
+When unattended operations are approved, set `AUTO_DAILY_BOOTSTRAP=1`. The API service will then run the bootstrap supervisor at startup and every `AUTO_BOOTSTRAP_INTERVAL_MINUTES`, forcing the active schedule window when `AUTO_BOOTSTRAP_FORCE=1`. Keep this enabled only on a service with persistent artifact storage mounted.
 
 ## Build And Runtime Flow
 
@@ -207,7 +211,7 @@ Railway cron jobs are good for short-lived scheduled tasks, not for the long-run
 Recommended first use:
 
 - keep the web service separate
-- if needed later, create dedicated cron-triggered services for:
+- if stronger isolation is needed later, create dedicated cron-triggered services for:
   - daily bootstrap
   - daily research pipeline
   - reporting refresh
@@ -229,4 +233,3 @@ After this prep, the next operational step is:
 3. set env vars
 4. deploy manually from GitHub
 5. validate `/health`, `/api/portal/overview`, and the dashboard UI
-

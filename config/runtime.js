@@ -31,6 +31,8 @@ const SCHEMA = {
   ENABLE_PORTFOLIO_GOVERNANCE: { type: 'boolean', default: true },
   ENABLE_TEMPORAL_RESEARCH: { type: 'boolean', default: true },
   AUTO_DAILY_BOOTSTRAP: { type: 'boolean', default: true },
+  AUTO_BOOTSTRAP_INTERVAL_MINUTES: { type: 'number', default: 15, min: 1 },
+  AUTO_BOOTSTRAP_FORCE: { type: 'boolean', default: true },
   VITE_DEV_PORT: { type: 'number', default: 5173, min: 1 },
 };
 
@@ -151,6 +153,8 @@ function validateAndBuildConfig() {
       appEnv: values.APP_ENV,
       logLevel: values.LOG_LEVEL,
       autoDailyBootstrap: values.AUTO_DAILY_BOOTSTRAP,
+      autoBootstrapIntervalMinutes: values.AUTO_BOOTSTRAP_INTERVAL_MINUTES,
+      autoBootstrapForce: values.AUTO_BOOTSTRAP_FORCE,
     },
     frontend: {
       apiUrl: values.VITE_API_URL,

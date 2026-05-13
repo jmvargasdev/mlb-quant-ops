@@ -139,8 +139,15 @@ Any future automation must preserve these rules:
 - no ambiguous timestamps,
 - no mixing of process freshness with market snapshot freshness.
 
+## Automation
+
+- If `AUTO_DAILY_BOOTSTRAP=1`, the API server starts a bootstrap supervisor.
+- The supervisor runs once at API startup and then every `AUTO_BOOTSTRAP_INTERVAL_MINUTES`.
+- `AUTO_BOOTSTRAP_FORCE=1` forces each scheduled tick to refresh the current operational window instead of silently skipping a previously completed date.
+- The supervisor does not start a second bootstrap if one is already running.
+- If `AUTO_DAILY_BOOTSTRAP=0`, use `npm run mlb:bootstrap` manually or run a dedicated platform cron/worker.
+
 ## Notes
 
-- If the API server is already running, the bootstrap will not rerun automatically until the server is restarted or `npm run mlb:bootstrap` is executed manually.
 - The dashboard should always show both the process update and the latest snapshot separately.
 - Historical tracking is required before CLV research, replay analysis, and daily operations validation are considered complete.
