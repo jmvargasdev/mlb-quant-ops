@@ -23,7 +23,8 @@
     "mlb:policy-feedback": "node mlb_ops/scripts/policy_feedback_engine.js",
     "mlb:research": "node mlb_ops/scripts/daily_research_pipeline.js",
     "mlb:ops": "node mlb_ops/scripts/daily_operations_orchestrator.js",
-    "mlb:bootstrap": "node mlb_ops/scripts/daily_system_bootstrap.js"
+    "mlb:bootstrap": "node mlb_ops/scripts/daily_system_bootstrap.js",
+    "journal:sync": "node mlb_ops/scripts/journal_sync.js"
   },
   "keywords": [],
   "author": "",

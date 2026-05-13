@@ -166,6 +166,25 @@ function main() {
   record.steps.push(research);
   appendDailyEvent(DATE, { type: 'stage', name: 'research', active_window: activeWindow, ...research });
 
+  const journalSync = process.env.JOURNAL_API_KEY
+    ? runScript('journal_sync.js', {
+      JOURNAL_API_URL: process.env.JOURNAL_API_URL || '',
+      JOURNAL_API_KEY: process.env.JOURNAL_API_KEY || '',
+    })
+    : {
+        script: 'journal_sync.js',
+        started_at: new Date().toISOString(),
+        ended_at: new Date().toISOString(),
+        duration_seconds: 0,
+        exit_code: 0,
+        status: 'skipped',
+        reason: 'JOURNAL_API_KEY not configured.',
+        stdout: '',
+        stderr: '',
+      };
+  record.steps.push(journalSync);
+  appendDailyEvent(DATE, { type: 'stage', name: 'journal_sync', active_window: activeWindow, ...journalSync });
+
   const status = readJsonIfExists(path.join(PROCESSED_DIR, 'daily_operations_status.json'));
   const scheduleTiming = status?.meta?.schedule_timing || {};
   const timelineProgress = status?.operational_health?.timeline_progress || null;
