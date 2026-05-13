@@ -83,15 +83,31 @@ components:
 This dashboard is a quantitative operations cockpit. It is not a sportsbook UI and it is not a consumer SaaS dashboard.
 The interface must support fast scanning, temporal reasoning, and decision-first workflows.
 
+The interface should be allocation-first. The most important frontend output is the executive allocation posture: what capital should be deployed, reduced, delayed, or passed, and why. The dashboard exists to support investors seeking profitable, risk-governed decisions, not to present abstract information as an end in itself.
+
+All analytical workspaces should function as epistemic support for the Executive Allocation Layer. Market structure, replay, CLV research, temporal persistence, and operational health should explain, validate, audit, or challenge the allocation decision rather than compete with it as equal primary destinations.
+
 The primary cognitive unit is the workspace:
 
 - Daily Ops
+- Decision Panel / Executive Allocation
 - Market Structure
 - Replay
 - CLV Research
 - Ops Health
 
 Each workspace answers one operational question and should preserve a dense, terminal-like feeling.
+
+The first question the application should answer is:
+
+- What should the operator do with capital now?
+
+Supporting questions follow:
+
+- How much exposure is justified?
+- Which structures deserve execution, reduction, delay, or pass?
+- What evidence supports the allocation?
+- What risk conditions would invalidate or downgrade it?
 
 ## Colors
 
@@ -119,10 +135,11 @@ Avoid oversized typography. The layout must remain information-dense.
 
 The layout should prioritize:
 
-1. Global operational heartbeat
-2. Workspace navigation
-3. Active workspace content
-4. Context rail
+1. Executive allocation and capital posture
+2. Global operational heartbeat
+3. Active decision evidence
+4. Workspace navigation
+5. Context rail
 
 The main content area should be wider than the rail.
 Primary workspaces should use vertical grouping rather than side-by-side fragmentation when the cards contain dense information.
