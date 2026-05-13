@@ -25,6 +25,19 @@ export function timestampFull(value) {
   return new Date(value).toLocaleString();
 }
 
+export function timestampFullWithZone(value) {
+  if (!value) return 'n/a';
+  return new Date(value).toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZoneName: 'short',
+  });
+}
+
 export function timeAgo(value) {
   if (!value) return 'n/a';
   const deltaMs = Date.now() - new Date(value).getTime();

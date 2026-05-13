@@ -3,6 +3,7 @@ import CompactStatGrid from '../../shared/components/CompactStatGrid';
 import SignalPill from '../../shared/components/SignalPill';
 import { fmt, humanizeFlag, timeAgo, timestampFull } from '../../shared/lib/formatters';
 import WorkspaceShell from '../../layouts/WorkspaceShell';
+import SnapshotFreshness from '../../shared/components/SnapshotFreshness';
 
 export default function OpsHealthWorkspace({ overview, status }) {
   const health = overview.operational_health || {};
@@ -35,9 +36,7 @@ export default function OpsHealthWorkspace({ overview, status }) {
                 <div className="mt-1 text-xs text-slate-400">{timeAgo(processUpdatedAt)}</div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <div className="rounded-xl border border-slate-700/30 bg-slate-900/40 p-3">
-                    <div className="mono text-[10px] uppercase tracking-[0.22em] text-slate-500">Last snapshot</div>
-                    <div className="mt-1 text-sm text-white">{timestampFull(latestSnapshotAt)}</div>
-                    <div className="mt-1 text-xs text-slate-400">{timeAgo(latestSnapshotAt)}</div>
+                    <SnapshotFreshness at={latestSnapshotAt} scheduleTiming={scheduleTiming} />
                   </div>
                   <div className="rounded-xl border border-slate-700/30 bg-slate-900/40 p-3">
                     <div className="mono text-[10px] uppercase tracking-[0.22em] text-slate-500">Next snapshot</div>

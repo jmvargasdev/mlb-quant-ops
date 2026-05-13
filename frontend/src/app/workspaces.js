@@ -1,48 +1,66 @@
-export const WORKSPACES = [
-  {
-    id: 'daily-ops',
-    label: 'Daily Ops',
-    shortLabel: 'Ops',
-    question: 'Que juegos son accionables ahora?',
-    description: 'Bettable leans, watchlist, fades y riesgo actual.',
-  },
+export const WORKSPACE_DEFINITIONS = [
   {
     id: 'decision-panel',
-    label: 'Decision Panel',
-    shortLabel: 'Decision',
-    question: 'Como debe comportarse el operador hoy?',
-    description: 'Operational posture, exposure, conviction tiers y portfolio risk.',
+    labelKey: 'workspace.decision.label',
+    shortLabelKey: 'workspace.decision.short',
+    questionKey: 'workspace.decision.question',
+    descriptionKey: 'workspace.decision.description',
   },
   {
-    id: 'market-structure',
-    label: 'Market Structure',
-    shortLabel: 'Structure',
-    question: 'Como esta evolucionando el mercado?',
-    description: 'Timeline temporal, presion, desacuerdo y movimiento de linea.',
-  },
-  {
-    id: 'replay',
-    label: 'Replay',
-    shortLabel: 'Replay',
-    question: 'Que ocurrio durante el dia?',
-    description: 'Reconstruccion intradia de precio, edge y volatilidad.',
+    id: 'daily-ops',
+    labelKey: 'workspace.daily.label',
+    shortLabelKey: 'workspace.daily.short',
+    questionKey: 'workspace.daily.question',
+    descriptionKey: 'workspace.daily.description',
   },
   {
     id: 'research',
-    label: 'Research',
-    shortLabel: 'RQ',
-    question: 'Que dice la memoria temporal del mercado?',
-    description: 'Persistence, timing quality, correction behavior y market memory.',
+    labelKey: 'workspace.research.label',
+    shortLabelKey: 'workspace.research.short',
+    questionKey: 'workspace.research.question',
+    descriptionKey: 'workspace.research.description',
+  },
+  {
+    id: 'market-structure',
+    labelKey: 'workspace.market.label',
+    shortLabelKey: 'workspace.market.short',
+    questionKey: 'workspace.market.question',
+    descriptionKey: 'workspace.market.description',
+  },
+  {
+    id: 'replay',
+    labelKey: 'workspace.replay.label',
+    shortLabelKey: 'workspace.replay.short',
+    questionKey: 'workspace.replay.question',
+    descriptionKey: 'workspace.replay.description',
   },
   {
     id: 'ops-health',
-    label: 'Ops Health',
-    shortLabel: 'Health',
-    question: 'El pipeline esta sano?',
-    description: 'Health operacional, densidad, calidad y confiabilidad.',
+    labelKey: 'workspace.health.label',
+    shortLabelKey: 'workspace.health.short',
+    questionKey: 'workspace.health.question',
+    descriptionKey: 'workspace.health.description',
   },
 ];
 
+export const WORKSPACES = WORKSPACE_DEFINITIONS.map((workspace) => ({
+  id: workspace.id,
+  label: workspace.labelKey,
+  shortLabel: workspace.shortLabelKey,
+  question: workspace.questionKey,
+  description: workspace.descriptionKey,
+}));
+
+export function localizeWorkspace(workspace, t) {
+  return {
+    ...workspace,
+    label: t(workspace.labelKey || workspace.label),
+    shortLabel: t(workspace.shortLabelKey || workspace.shortLabel),
+    question: t(workspace.questionKey || workspace.question),
+    description: t(workspace.descriptionKey || workspace.description),
+  };
+}
+
 export function workspaceById(id) {
-  return WORKSPACES.find((workspace) => workspace.id === id) || WORKSPACES[0];
+  return WORKSPACE_DEFINITIONS.find((workspace) => workspace.id === id) || WORKSPACE_DEFINITIONS[0];
 }
