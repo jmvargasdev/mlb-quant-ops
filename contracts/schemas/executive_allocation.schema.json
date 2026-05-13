@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mlb-quant-ops.local/schemas/executive_allocation.schema.json",
+  "title": "Executive Allocation",
+  "type": "object",
+  "required": [
+    "aggression_state",
+    "deployment_risk",
+    "deployment_evaluation",
+    "allocation_rows",
+    "executive_memo",
+    "policy_gates"
+  ],
+  "properties": {
+    "aggression_state": {
+      "type": "string",
+      "enum": ["Restricted", "Defensive", "Selective", "Moderate", "Opportunistic"]
+    },
+    "deployment_risk": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/risk_item"
+      }
+    },
+    "deployment_evaluation": {
+      "type": "object",
+      "required": [
+        "total_allocated_exposure",
+        "governed_total_exposure",
+        "compression_from_raw",
+        "active_decisions",
+        "passed_decisions",
+        "narrative"
+      ],
+      "properties": {
+        "total_allocated_exposure": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]{2})?u$" },
+        "governed_total_exposure": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]{2})?u$" },
+        "compression_from_raw": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]{2})?u$" },
+        "active_decisions": { "type": "number" },
+        "passed_decisions": { "type": "number" },
+        "narrative": { "type": "string", "minLength": 1 }
+      }
+    },
+    "allocation_rows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/allocation_row"
+      }
+    },
+    "executive_memo": {
+      "type": "object",
+      "required": [
+        "executive_summary",
+        "deployment_posture",
+        "exposure_style",
+        "timing_interpretation",
+        "risk_concentration",
+        "slate_stability",
+        "portfolio_warnings",
+        "recommended_deployment"
+      ],
+      "properties": {
+        "executive_summary": { "type": "string", "minLength": 1 },
+        "deployment_posture": { "type": "string", "minLength": 1 },
+        "exposure_style": { "type": "string", "minLength": 1 },
+        "timing_interpretation": { "type": "string", "minLength": 1 },
+        "risk_concentration": { "type": "string", "minLength": 1 },
+        "slate_stability": { "type": "string", "minLength": 1 },
+        "portfolio_warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/risk_item"
+          }
+        },
+        "recommended_deployment": { "type": "string", "minLength": 1 }
+      }
+    },
+    "primary_allocation": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/allocation_row" }
+      ]
+    },
+    "policy_gates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/policy_gate"
+      }
+    }
+  },
+  "$defs": {
+    "allocation_row": {
+      "type": "object",
+      "required": [
+        "game_id",
+        "side",
+        "team",
+        "matchup",
+        "action",
+        "raw_exposure",
+        "executive_exposure",
+        "executive_exposure_units",
+        "conviction_tier",
+        "reason"
+      ],
+      "properties": {
+        "game_id": {
+          "type": ["number", "string"]
+        },
+        "side": {
+          "type": "string",
+          "enum": ["home", "away"]
+        },
+        "team": {
+          "type": "string",
+          "minLength": 1
+        },
+        "matchup": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "enum": ["Execute Now", "Reduced Quality", "Wait for Confirmation", "Pass"]
+        },
+        "raw_exposure": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executive_exposure": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]{2})?u$"
+        },
+        "executive_exposure_units": {
+          "type": "number"
+        },
+        "conviction_tier": {
+          "type": "string",
+          "enum": ["Elite Conviction", "High Conviction", "Supportive", "Speculative", "Watchlist", "Unstable", "Decaying"]
+        },
+        "timing_quality_score": {
+          "type": ["number", "null"]
+        },
+        "operational_conviction": {
+          "type": ["number", "null"]
+        },
+        "structure_quality": {
+          "type": ["string", "null"]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "policy_gate": {
+      "type": "object",
+      "required": ["code", "status", "effect", "severity", "evidence"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": ["passed", "active"]
+        },
+        "effect": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "warning", "critical"]
+        },
+        "evidence": {
+          "type": "object"
+        }
+      }
+    },
+    "risk_item": {
+      "type": "object",
+      "required": ["label", "severity", "context"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

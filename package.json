@@ -10,6 +10,7 @@
     "dashboard:web": "vite",
     "dashboard:build": "vite build",
     "dashboard:preview": "vite preview",
+    "contracts:validate": "node contracts/validate.js",
     "mlb:crons": "node mlb_ops/scripts/cron_status_report.js",
     "mlb:collect": "node mlb_ops/scripts/collect_mlb_ops.js",
     "mlb:score": "node mlb_ops/scripts/scoring_engine.js",
