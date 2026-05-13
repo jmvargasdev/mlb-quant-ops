@@ -167,7 +167,7 @@ function main() {
   console.log(JSON.stringify({
     status: 'passed',
     contracts: ['executive_allocation'],
-    policies: ['PASS_CANNOT_BE_PRIMARY'],
+    policies: executiveAllocation.policy_gates.map((gate) => gate.code),
     allocation_rows: executiveAllocation.allocation_rows.length,
     primary_allocation: executiveAllocation.primary_allocation?.team || null,
   }, null, 2));

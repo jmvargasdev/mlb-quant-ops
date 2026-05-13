@@ -973,23 +973,6 @@ function exposureUnits(exposure) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
-function actionPriority(action) {
-  if (action === 'Execute Now') return 4;
-  if (action === 'Wait for Confirmation') return 3;
-  if (action === 'Reduced Quality') return 2;
-  if (action === 'Pass') return 0;
-  return 1;
-}
-
-function tierPriority(tier) {
-  if (tier === 'Elite Conviction') return 5;
-  if (tier === 'High Conviction') return 4;
-  if (tier === 'Supportive') return 3;
-  if (tier === 'Speculative') return 2;
-  if (tier === 'Watchlist') return 1;
-  return 0;
-}
-
 function aggregateRiskReading(value, thresholds, labels) {
   if (!Number.isFinite(Number(value))) return labels[labels.length - 1];
   const numeric = Number(value);
@@ -1277,35 +1260,6 @@ function readDecisionLedger(date) {
   return readJsonLinesIfExists(decisionLedgerPath(date));
 }
 
-function selectPrimaryAllocation(allocationRows) {
-  return [...(allocationRows || [])]
-    .filter((row) => row.action !== 'Pass' && exposureUnits(row.executive_exposure) > 0)
-    .sort((a, b) => (
-      actionPriority(b.action) - actionPriority(a.action)
-      || exposureUnits(b.executive_exposure) - exposureUnits(a.executive_exposure)
-      || tierPriority(b.conviction_tier) - tierPriority(a.conviction_tier)
-      || Number(b.operational_conviction || 0) - Number(a.operational_conviction || 0)
-    ))[0] || null;
-}
-
-function evaluateExecutivePolicies(allocationRows, primaryAllocation) {
-  const primaryCandidate = primaryAllocation || selectPrimaryAllocation(allocationRows);
-  const passPrimaryViolation = primaryCandidate?.action === 'Pass';
-  return [
-    {
-      code: 'PASS_CANNOT_BE_PRIMARY',
-      status: passPrimaryViolation ? 'active' : 'passed',
-      effect: passPrimaryViolation ? 'block_primary_allocation' : 'none',
-      severity: passPrimaryViolation ? 'critical' : 'info',
-      evidence: {
-        primary_game_id: primaryCandidate?.game_id || null,
-        primary_team: primaryCandidate?.team || null,
-        primary_action: primaryCandidate?.action || null,
-      },
-    },
-  ];
-}
-
 function buildDecisionLedgerRows({
   date,
   generatedAt,
@@ -1498,10 +1452,6 @@ function buildDecisionPanel() {
     slateStability: portfolioGovernance.slate_stability,
     aggregateExposureIntelligence: portfolioGovernance.aggregate_exposure_intelligence,
   });
-  const primaryAllocation = selectPrimaryAllocation(executiveAllocation.allocation_rows);
-  const policyGates = evaluateExecutivePolicies(executiveAllocation.allocation_rows, primaryAllocation);
-  executiveAllocation.primary_allocation = primaryAllocation;
-  executiveAllocation.policy_gates = policyGates;
   const ledgerRows = buildDecisionLedgerRows({
     date: state.date,
     generatedAt,

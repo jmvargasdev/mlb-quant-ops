@@ -1,11 +1,13 @@
+const {
+  evaluateExecutivePolicyGates,
+  evaluateStructurePolicies,
+  parseExposure,
+  selectPrimaryAllocation,
+} = require('./policies');
+
 function round(value, digits = 2) {
   if (value === null || value === undefined || Number.isNaN(value)) return null;
   return Number(value.toFixed(digits));
-}
-
-function parseExposure(exposure) {
-  const numeric = Number.parseFloat(exposure);
-  return Number.isFinite(numeric) ? numeric : 0;
 }
 
 function formatExposure(units) {
@@ -77,18 +79,6 @@ function detectDeploymentRisk({ correlationAwareness, concentrationRisk, aggrega
   return warnings.slice(0, 6);
 }
 
-function actionForStructure(structure, aggressionState) {
-  if (parseExposure(structure.exposure) <= 0) return 'Pass';
-  if (structure.lifecycle === 'collapsing' || structure.validation_bucket === 'rejected') return 'Pass';
-  if ((structure.reason_codes || []).includes('LATE_CONFIRMATION_REQUIRED') || (structure.timing_quality_score || 0) < 20) {
-    return 'Wait for Confirmation';
-  }
-  if ((structure.volatility_score || 0) >= 14 || (structure.disagreement_score || 0) >= 0.05 || aggressionState === 'Restricted') {
-    return 'Reduced Quality';
-  }
-  return 'Execute Now';
-}
-
 function priorityWeight(structure, action) {
   if (action === 'Pass') return 0;
   let weight = parseExposure(structure.exposure);
@@ -105,12 +95,13 @@ function priorityWeight(structure, action) {
 
 function compressExposure({ structures, governedTotalExposure, maxSingleExposure, aggressionState }) {
   const candidates = structures.map((structure) => {
-    const action = actionForStructure(structure, aggressionState);
+    const policyEvaluation = evaluateStructurePolicies(structure, aggressionState);
     return {
       ...structure,
-      action,
+      action: policyEvaluation.action,
+      policy_gates: policyEvaluation.gates,
       base_units: parseExposure(structure.exposure),
-      priority_weight: priorityWeight(structure, action),
+      priority_weight: priorityWeight(structure, policyEvaluation.action),
     };
   });
 
@@ -257,7 +248,13 @@ function generateExecutiveAllocation({
     operational_conviction: row.operational_conviction,
     structure_quality: row.structure_quality,
     reason: buildDecisionReason(row, row.action),
+    policy_gates: row.policy_gates || [],
   }));
+  const primaryAllocation = selectPrimaryAllocation(allocationRows);
+  const policyGates = evaluateExecutivePolicyGates({
+    allocationRows,
+    primaryAllocation,
+  });
   const deploymentEvaluation = evaluatePortfolioDeployment({
     allocationRows,
     governedTotalExposure,
@@ -278,6 +275,8 @@ function generateExecutiveAllocation({
     deployment_risk: deploymentRisk,
     deployment_evaluation: deploymentEvaluation,
     allocation_rows: allocationRows,
+    primary_allocation: primaryAllocation,
+    policy_gates: policyGates,
     executive_memo: executiveMemo,
   };
 }
@@ -287,6 +286,8 @@ module.exports = {
   detectDeploymentRisk,
   compressExposure,
   evaluatePortfolioDeployment,
+  evaluateExecutivePolicyGates,
   generateExecutiveAllocation,
   generateExecutiveMemo,
+  selectPrimaryAllocation,
 };
