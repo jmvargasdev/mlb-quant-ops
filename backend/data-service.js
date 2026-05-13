@@ -2274,6 +2274,7 @@ function rawArtifact(name) {
     ['market_timeline', path.join(PROCESSED_DIR, 'market_timeline.json')],
     ['daily_operations_status', path.join(PROCESSED_DIR, 'daily_operations_status.json')],
     ['daily_execution_plan', path.join(PROCESSED_DIR, 'daily_execution_plan.json')],
+    ['pending_ledger_closure', path.join(PROCESSED_DIR, 'pending_ledger_closure.json')],
     ['edge_validation', path.join(PROCESSED_DIR, 'edge_validation.json')],
     ['clv_research', path.join(PROCESSED_DIR, 'clv_research.json')],
     ['outcome_attribution', path.join(PROCESSED_DIR, 'outcome_attribution.json')],

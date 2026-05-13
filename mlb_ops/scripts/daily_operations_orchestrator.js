@@ -188,6 +188,12 @@ function buildStagePlan(snapshotLabel) {
       env: {},
     },
     {
+      name: 'close_pending_ledgers',
+      script: 'close_pending_ledgers.js',
+      enabled: true,
+      env: {},
+    },
+    {
       name: 'policy_feedback',
       script: 'policy_feedback_engine.js',
       enabled: true,

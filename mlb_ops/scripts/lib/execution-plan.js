@@ -104,6 +104,20 @@ const EXECUTION_STEPS = [
     retryable: true,
   },
   {
+    name: 'close_pending_ledgers',
+    stage_name: 'close_pending_ledgers',
+    framework_reference: ['Event Sourcing projection', 'Temporal history model'],
+    input_artifacts: [
+      'mlb_ops/historical/decision_ledger/*.jsonl',
+      'mlb_ops/historical/outcome_attribution/*.jsonl',
+    ],
+    output_artifacts: [
+      'mlb_ops/processed/pending_ledger_closure.json',
+      'mlb_ops/historical/outcome_attribution/{date}.jsonl',
+    ],
+    retryable: true,
+  },
+  {
     name: 'policy_feedback',
     stage_name: 'policy_feedback',
     framework_reference: ['OPA policy review loop', 'ReAct verify step', 'Human-in-the-loop governance'],
