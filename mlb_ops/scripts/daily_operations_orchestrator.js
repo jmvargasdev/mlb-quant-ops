@@ -187,6 +187,12 @@ function buildStagePlan(snapshotLabel) {
       enabled: true,
       env: {},
     },
+    {
+      name: 'policy_feedback',
+      script: 'policy_feedback_engine.js',
+      enabled: true,
+      env: {},
+    },
   ];
 }
 

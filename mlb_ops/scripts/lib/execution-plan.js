@@ -103,6 +103,20 @@ const EXECUTION_STEPS = [
     ],
     retryable: true,
   },
+  {
+    name: 'policy_feedback',
+    stage_name: 'policy_feedback',
+    framework_reference: ['OPA policy review loop', 'ReAct verify step', 'Human-in-the-loop governance'],
+    input_artifacts: [
+      'mlb_ops/processed/outcome_attribution.json',
+      'mlb_ops/historical/outcome_attribution/{date}.jsonl',
+    ],
+    output_artifacts: [
+      'mlb_ops/processed/policy_feedback.json',
+      'mlb_ops/reports/policy_feedback_report.md',
+    ],
+    retryable: true,
+  },
 ];
 
 function materializeTemplate(value, context) {

@@ -2202,6 +2202,7 @@ function rawArtifact(name) {
     ['edge_validation', path.join(PROCESSED_DIR, 'edge_validation.json')],
     ['clv_research', path.join(PROCESSED_DIR, 'clv_research.json')],
     ['outcome_attribution', path.join(PROCESSED_DIR, 'outcome_attribution.json')],
+    ['policy_feedback', path.join(PROCESSED_DIR, 'policy_feedback.json')],
     ['persistence_research', path.join(PROCESSED_DIR, 'persistence_research.json')],
     ['timing_quality_research', path.join(PROCESSED_DIR, 'timing_quality_research.json')],
     ['research_status', path.join(PROCESSED_DIR, 'research_status.json')],
