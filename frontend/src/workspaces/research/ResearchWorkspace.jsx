@@ -56,41 +56,51 @@ export default function ResearchWorkspace({ overview, status, active }) {
         <>
           <PanelFrame
             title="Quant Report"
-            subtitle="Briefing institucional descargable con síntesis operacional, research temporal y market structure en un solo memo."
-            className="border border-sky-300/20 bg-[linear-gradient(135deg,rgba(113,199,255,0.12),rgba(7,16,24,0.96)_42%,rgba(61,220,151,0.08))]"
+            subtitle="Downloadable institutional memo with operational posture, temporal research and market structure."
             action={(
               <a
                 href={apiPath('/api/portal/quant-report/download')}
-                className="rounded-2xl border border-sky-200/45 bg-sky-300/16 px-4 py-3 text-sm font-semibold text-sky-50 shadow-[0_0_24px_rgba(113,199,255,0.12)] transition hover:border-sky-200/70 hover:bg-sky-300/22"
+                className="rounded-xl border border-sky-300/35 bg-sky-300/10 px-3 py-2 text-sm font-semibold text-sky-100 transition hover:border-sky-300/55 hover:bg-sky-300/15"
               >
-                Download Quant Report
+                Download
               </a>
             )}
           >
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(320px,0.85fr)]">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-slate-700/35 bg-slate-950/45 px-4 py-3">
+            <div className="grid gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-700/35 bg-slate-950/35 px-4 py-3">
+                <div>
                   <div className="mono text-[11px] uppercase tracking-[0.22em] text-slate-500">Report Status</div>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <SignalPill tone={reportStatus.error ? 'danger' : 'positive'}>{reportStatus.error ? 'report error' : 'report ready'}</SignalPill>
-                    {reportStatus.refreshing && <SignalPill tone="neutral">refreshing</SignalPill>}
+                    <SignalPill tone={reportStatus.error ? 'danger' : 'positive'}>{reportStatus.error ? 'Error' : 'Ready'}</SignalPill>
+                    {reportStatus.refreshing && <SignalPill tone="neutral">Refreshing</SignalPill>}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-slate-700/35 bg-slate-950/45 px-4 py-3">
-                  <div className="mono text-[11px] uppercase tracking-[0.22em] text-slate-500">Current File</div>
-                  <div className="mt-2 text-sm text-white">{report?.meta?.current_relative_path || 'mlb_ops/reports/downloadable_quant_report.md'}</div>
-                </div>
-                <div className="rounded-2xl border border-slate-700/35 bg-slate-950/45 px-4 py-3">
-                  <div className="mono text-[11px] uppercase tracking-[0.22em] text-slate-500">Versioned File</div>
-                  <div className="mt-2 text-sm text-white">{report?.meta?.dated_relative_path || 'mlb_ops/reports/quant_reports/<date>_downloadable_quant_report.md'}</div>
+                <div className="min-w-[180px] text-right">
+                  <div className="mono text-[11px] uppercase tracking-[0.22em] text-slate-500">Generated</div>
+                  <div className="mt-1 text-sm text-white">{timestampFull(report?.meta?.generated_at)}</div>
                 </div>
               </div>
-              <div className="rounded-2xl border border-slate-700/35 bg-slate-950/45 px-4 py-3">
-                <div className="mono text-[11px] uppercase tracking-[0.22em] text-slate-500">Preview</div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-700/35 bg-slate-950/35 px-4 py-3">
+                  <div className="mono text-[11px] uppercase tracking-[0.22em] text-slate-500">Current File</div>
+                  <div className="mt-2 break-all text-xs text-slate-300">{report?.meta?.current_relative_path || 'mlb_ops/reports/downloadable_quant_report.md'}</div>
+                </div>
+                <div className="rounded-2xl border border-slate-700/35 bg-slate-950/35 px-4 py-3">
+                  <div className="mono text-[11px] uppercase tracking-[0.22em] text-slate-500">Versioned File</div>
+                  <div className="mt-2 break-all text-xs text-slate-300">{report?.meta?.dated_relative_path || 'mlb_ops/reports/quant_reports/<date>_downloadable_quant_report.md'}</div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-700/35 bg-slate-950/35">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-700/35 px-4 py-3">
+                  <div className="mono text-[11px] uppercase tracking-[0.22em] text-slate-500">Markdown Preview</div>
+                  <div className="text-xs text-slate-500">{reportPreview ? 'first section preview' : 'pending generation'}</div>
+                </div>
                 {reportStatus.error ? (
-                  <div className="mt-2 text-sm text-rose-300">{reportStatus.error}</div>
+                  <div className="px-4 py-3 text-sm text-rose-300">{reportStatus.error}</div>
                 ) : (
-                  <pre className="scrollbar-thin mt-2 max-h-[220px] overflow-auto whitespace-pre-wrap text-xs leading-6 text-slate-300">
+                  <pre className="scrollbar-thin max-h-[260px] overflow-auto whitespace-pre-wrap px-4 py-3 text-xs leading-6 text-slate-300">
                     {reportPreview || 'Generating markdown intelligence memo...'}
                   </pre>
                 )}
@@ -130,32 +140,6 @@ export default function ResearchWorkspace({ overview, status, active }) {
                 <div className="mono text-[11px] uppercase tracking-[0.22em] text-slate-500">Pipeline Step</div>
                 <div className="mt-1 text-white">{researchRun?.script || 'n/a'}</div>
                 <div className="mt-1 text-xs text-slate-400">duration {researchRun?.duration_seconds === undefined ? 'n/a' : `${fmt(researchRun.duration_seconds, 3)}s`}</div>
-              </div>
-            </div>
-          </PanelFrame>
-
-          <PanelFrame
-            title="Report Access"
-            subtitle="Secondary access point and file location reference."
-          >
-            <div className="grid gap-3">
-              <div className="rounded-2xl border border-slate-700/35 bg-slate-950/45 px-4 py-3">
-                <div className="mono text-[11px] uppercase tracking-[0.22em] text-slate-500">Primary File</div>
-                <div className="mt-2 text-xs text-slate-400">
-                  {report?.meta?.current_relative_path || 'mlb_ops/reports/downloadable_quant_report.md'}
-                </div>
-                <div className="mt-1 text-xs text-slate-400">
-                  versioned {report?.meta?.dated_relative_path || 'mlb_ops/reports/quant_reports/<date>_downloadable_quant_report.md'}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-slate-700/35 bg-slate-950/45 px-4 py-3">
-                <div className="mono text-[11px] uppercase tracking-[0.22em] text-slate-500">Download</div>
-                <a
-                  href={apiPath('/api/portal/quant-report/download')}
-                  className="mt-2 inline-flex rounded-xl border border-sky-300/30 bg-sky-300/8 px-3 py-2 text-xs font-semibold text-sky-100 transition hover:border-sky-300/45"
-                >
-                  Download Quant Report
-                </a>
               </div>
             </div>
           </PanelFrame>
