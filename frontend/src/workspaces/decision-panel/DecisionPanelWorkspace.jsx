@@ -317,7 +317,9 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
   const deployment = executive.deployment_evaluation || {};
   const allocationRows = executive.allocation_rows || [];
   const structures = data?.best_structures || [];
-  const primaryAllocation = resolvePrimaryAllocation(allocationRows);
+  const primaryAllocation = executive.primary_allocation || resolvePrimaryAllocation(allocationRows);
+  const policyGates = executive.policy_gates || [];
+  const decisionLedger = data?.decision_ledger || {};
   const topRawEdge = resolveTopRawEdge(structures);
   const topRawEdgeAllocation = findAllocationForStructure(allocationRows, topRawEdge);
   const highConvictionSignals = resolveHighConvictionSignals(allocationRows);
@@ -581,6 +583,32 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
               {t('decision.updated')} {timestampFull(lastUpdated)}
             </div>
             <div className="mt-1 mono text-[10px] uppercase tracking-[0.18em] text-slate-500">{timeAgo(lastUpdated)}</div>
+          </PanelFrame>
+
+          <PanelFrame title={t('decision.auditMemory')} subtitle={t('decision.auditMemorySubtitle')}>
+            <div className="grid gap-3">
+              <div className="rounded-2xl border border-slate-700/35 bg-slate-950/35 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="mono text-[11px] uppercase tracking-[0.22em] text-slate-500">{t('decision.decisionLedger')}</div>
+                    <div className="mt-1 text-sm text-white">{decisionLedger.path || 'n/a'}</div>
+                  </div>
+                  <SignalPill tone={decisionLedger.status === 'active' ? 'positive' : 'warning'}>{decisionLedger.status || 'n/a'}</SignalPill>
+                </div>
+                <div className="mt-2 text-xs text-slate-400">
+                  {t('decision.ledgerRecords')}: {decisionLedger.total_records ?? 0} / {t('decision.ledgerAppended')}: {decisionLedger.appended_records ?? 0}
+                </div>
+              </div>
+              {policyGates.map((gate) => (
+                <div key={gate.code} className="rounded-2xl border border-slate-700/35 bg-slate-950/35 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm text-white">{gate.code}</div>
+                    <SignalPill tone={gate.status === 'passed' ? 'positive' : 'danger'}>{gate.status}</SignalPill>
+                  </div>
+                  <div className="mt-2 text-xs text-slate-400">{gate.effect}</div>
+                </div>
+              ))}
+            </div>
           </PanelFrame>
         </>
       }

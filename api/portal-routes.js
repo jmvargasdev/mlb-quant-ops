@@ -1,6 +1,7 @@
 const express = require('express');
 const {
   buildDecisionPanel,
+  buildDecisionLedgerStatus,
   buildOverview,
   buildQuantReportMarkdown,
   buildResearchWorkspace,
@@ -17,6 +18,10 @@ router.get('/overview', (req, res) => {
 
 router.get('/decision-panel', (req, res) => {
   res.json(buildDecisionPanel());
+});
+
+router.get('/decision-ledger', (req, res) => {
+  res.json(buildDecisionLedgerStatus(req.query.date));
 });
 
 router.get('/games/:gameId', (req, res) => {

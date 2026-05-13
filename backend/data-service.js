@@ -13,6 +13,7 @@ const LOGS_DIR = path.join(OPS_ROOT, 'logs');
 const HISTORY_DIR = path.join(OPS_ROOT, 'historical');
 const RESEARCH_HISTORY_DIR = path.join(HISTORY_DIR, 'research');
 const RESEARCH_HISTORY_PATH = path.join(RESEARCH_HISTORY_DIR, 'history.jsonl');
+const DECISION_LEDGER_DIR = path.join(HISTORY_DIR, 'decision_ledger');
 const QUANT_REPORTS_DIR = path.join(REPORTS_DIR, 'quant_reports');
 const RESEARCH_WINDOWS = [
   '06:00_open',
@@ -51,6 +52,11 @@ function readJsonLinesIfExists(filePath) {
 function writeText(filePath, text) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, text, 'utf8');
+}
+
+function appendText(filePath, text) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.appendFileSync(filePath, text, 'utf8');
 }
 
 function round(value, digits = 4) {
@@ -967,6 +973,23 @@ function exposureUnits(exposure) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function actionPriority(action) {
+  if (action === 'Execute Now') return 4;
+  if (action === 'Wait for Confirmation') return 3;
+  if (action === 'Reduced Quality') return 2;
+  if (action === 'Pass') return 0;
+  return 1;
+}
+
+function tierPriority(tier) {
+  if (tier === 'Elite Conviction') return 5;
+  if (tier === 'High Conviction') return 4;
+  if (tier === 'Supportive') return 3;
+  if (tier === 'Speculative') return 2;
+  if (tier === 'Watchlist') return 1;
+  return 0;
+}
+
 function aggregateRiskReading(value, thresholds, labels) {
   if (!Number.isFinite(Number(value))) return labels[labels.length - 1];
   const numeric = Number(value);
@@ -1236,9 +1259,135 @@ function buildPortfolioGovernance({
   };
 }
 
+function decisionLedgerPath(date) {
+  return path.join(DECISION_LEDGER_DIR, `${date}.jsonl`);
+}
+
+function decisionLedgerKey(row) {
+  return [
+    row.date,
+    row.snapshot_label,
+    row.source_signature,
+    row.game_id,
+    row.side,
+  ].map((value) => value || 'unknown').join(':');
+}
+
+function readDecisionLedger(date) {
+  return readJsonLinesIfExists(decisionLedgerPath(date));
+}
+
+function selectPrimaryAllocation(allocationRows) {
+  return [...(allocationRows || [])]
+    .filter((row) => row.action !== 'Pass' && exposureUnits(row.executive_exposure) > 0)
+    .sort((a, b) => (
+      actionPriority(b.action) - actionPriority(a.action)
+      || exposureUnits(b.executive_exposure) - exposureUnits(a.executive_exposure)
+      || tierPriority(b.conviction_tier) - tierPriority(a.conviction_tier)
+      || Number(b.operational_conviction || 0) - Number(a.operational_conviction || 0)
+    ))[0] || null;
+}
+
+function evaluateExecutivePolicies(allocationRows, primaryAllocation) {
+  const primaryCandidate = primaryAllocation || selectPrimaryAllocation(allocationRows);
+  const passPrimaryViolation = primaryCandidate?.action === 'Pass';
+  return [
+    {
+      code: 'PASS_CANNOT_BE_PRIMARY',
+      status: passPrimaryViolation ? 'active' : 'passed',
+      effect: passPrimaryViolation ? 'block_primary_allocation' : 'none',
+      severity: passPrimaryViolation ? 'critical' : 'info',
+      evidence: {
+        primary_game_id: primaryCandidate?.game_id || null,
+        primary_team: primaryCandidate?.team || null,
+        primary_action: primaryCandidate?.action || null,
+      },
+    },
+  ];
+}
+
+function buildDecisionLedgerRows({
+  date,
+  generatedAt,
+  snapshotLabel,
+  sourceSignature,
+  executiveAllocation,
+  structures,
+  posture,
+  portfolioSummary,
+}) {
+  const evidenceByKey = new Map((structures || []).map((row) => [`${row.game_id}:${row.side}`, row]));
+  return (executiveAllocation?.allocation_rows || []).map((row) => {
+    const evidence = evidenceByKey.get(`${row.game_id}:${row.side}`) || {};
+    return {
+      date,
+      snapshot_label: snapshotLabel || null,
+      generated_at: generatedAt,
+      game_id: row.game_id,
+      team: row.team,
+      side: row.side,
+      action: row.action,
+      executive_exposure: row.executive_exposure,
+      raw_exposure: row.raw_exposure,
+      conviction_tier: row.conviction_tier,
+      reason: row.reason,
+      reason_codes: evidence.reason_codes || [],
+      timing_quality_score: row.timing_quality_score ?? evidence.timing_quality_score ?? null,
+      persistence_score: evidence.persistence_score ?? null,
+      volatility_score: evidence.volatility_score ?? null,
+      operational_conviction: row.operational_conviction ?? evidence.operational_conviction ?? null,
+      market_regime: posture?.marketRegime || null,
+      portfolio_risk: portfolioSummary?.portfolio_risk || null,
+      source_signature: sourceSignature || null,
+      result_status: 'pending',
+    };
+  });
+}
+
+function writeDecisionLedger({ date, rows }) {
+  const filePath = decisionLedgerPath(date);
+  const existingRows = readDecisionLedger(date);
+  const existingKeys = new Set(existingRows.map(decisionLedgerKey));
+  const newRows = rows.filter((row) => !existingKeys.has(decisionLedgerKey(row)));
+
+  if (newRows.length) {
+    appendText(filePath, `${newRows.map((row) => JSON.stringify(row)).join('\n')}\n`);
+  }
+
+  const totalRecords = existingRows.length + newRows.length;
+  const currentKeys = new Set(rows.map(decisionLedgerKey));
+  const recordedCurrentRecords = [...existingKeys, ...newRows.map(decisionLedgerKey)]
+    .filter((key) => currentKeys.has(key)).length;
+  const lastRecord = newRows[newRows.length - 1] || existingRows[existingRows.length - 1] || null;
+  return {
+    status: 'active',
+    path: path.relative(ROOT, filePath),
+    expected_records: rows.length,
+    recorded_current_records: recordedCurrentRecords,
+    appended_records: newRows.length,
+    total_records: totalRecords,
+    coverage: rows.length ? round((recordedCurrentRecords / rows.length) * 100, 2) : 0,
+    last_write_at: newRows.length ? newRows[newRows.length - 1].generated_at : null,
+    last_record_at: lastRecord?.generated_at || null,
+  };
+}
+
+function buildDecisionLedgerStatus(date = loadCoreState().date) {
+  const rows = readDecisionLedger(date);
+  const filePath = decisionLedgerPath(date);
+  return {
+    date,
+    status: rows.length ? 'active' : 'empty',
+    path: path.relative(ROOT, filePath),
+    total_records: rows.length,
+    last_record_at: rows[rows.length - 1]?.generated_at || null,
+  };
+}
+
 function buildDecisionPanel() {
   const state = loadCoreState();
   const overview = buildOverview();
+  const generatedAt = new Date().toISOString();
   const research = buildResearchWorkspace();
   const checklist = state.checklist || {};
   const topBettable = overview.sections.top_bettable || [];
@@ -1349,6 +1498,24 @@ function buildDecisionPanel() {
     slateStability: portfolioGovernance.slate_stability,
     aggregateExposureIntelligence: portfolioGovernance.aggregate_exposure_intelligence,
   });
+  const primaryAllocation = selectPrimaryAllocation(executiveAllocation.allocation_rows);
+  const policyGates = evaluateExecutivePolicies(executiveAllocation.allocation_rows, primaryAllocation);
+  executiveAllocation.primary_allocation = primaryAllocation;
+  executiveAllocation.policy_gates = policyGates;
+  const ledgerRows = buildDecisionLedgerRows({
+    date: state.date,
+    generatedAt,
+    snapshotLabel: overview.meta?.latest_snapshot_label || state.operations?.meta?.snapshot_label || null,
+    sourceSignature: overview.meta?.latest_snapshot_signature || null,
+    executiveAllocation,
+    structures,
+    posture,
+    portfolioSummary: portfolioGovernance.portfolio_summary,
+  });
+  const decisionLedger = writeDecisionLedger({
+    date: state.date,
+    rows: ledgerRows,
+  });
   const overallExposure = structures.reduce((sum, row) => sum + exposureUnits(row.exposure), 0);
   const operationalConclusion = {
     recommended_behavior: posture.recommendedStyle,
@@ -1361,8 +1528,10 @@ function buildDecisionPanel() {
   return {
     meta: {
       date: state.date,
-      generated_at: new Date().toISOString(),
+      generated_at: generatedAt,
       refresh_policy: overview.meta?.refresh_policy || null,
+      latest_snapshot_signature: overview.meta?.latest_snapshot_signature || null,
+      latest_snapshot_label: overview.meta?.latest_snapshot_label || null,
     },
     operational_posture: posture,
     market_environment: environment,
@@ -1375,6 +1544,7 @@ function buildDecisionPanel() {
     portfolio_aggression_control: portfolioGovernance.portfolio_aggression_control,
     aggregate_exposure_intelligence: portfolioGovernance.aggregate_exposure_intelligence,
     executive_allocation: executiveAllocation,
+    decision_ledger: decisionLedger,
     best_structures: structures,
     timing_persistence: {
       best_window: bestWindow,
@@ -2091,6 +2261,7 @@ function rawArtifact(name) {
 
 module.exports = {
   buildDecisionPanel,
+  buildDecisionLedgerStatus,
   buildOverview,
   buildResearchWorkspace,
   buildQuantReportMarkdown,
