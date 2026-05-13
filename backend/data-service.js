@@ -1338,6 +1338,80 @@ function buildDecisionLedgerStatus(date = loadCoreState().date) {
   };
 }
 
+function countBy(rows, key) {
+  return rows.reduce((acc, row) => {
+    const value = row[key] || 'unknown';
+    acc[value] = (acc[value] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+function buildLearningObservability(date = loadCoreState().date, executiveAllocation = null) {
+  const ledgerRows = readDecisionLedger(date);
+  const executionPlan = readJsonIfExists(path.join(PROCESSED_DIR, 'daily_execution_plan.json'));
+  const outcomeAttribution = readJsonIfExists(path.join(PROCESSED_DIR, 'outcome_attribution.json'));
+  const policyFeedback = readJsonIfExists(path.join(PROCESSED_DIR, 'policy_feedback.json'));
+  const allocation = executiveAllocation || buildDecisionPanel().executive_allocation || {};
+  const allocationRows = allocation.allocation_rows || [];
+  const policyGates = allocation.policy_gates || [];
+  const decisionTrace = allocation.decision_trace || [];
+  const contractValidationStep = executionPlan?.steps?.find((step) => step.name === 'contract_validation') || null;
+  const outcomeRows = outcomeAttribution?.rows || [];
+  const recommendations = policyFeedback?.recommendations || [];
+
+  return {
+    date,
+    generated_at: new Date().toISOString(),
+    framework_reference: ['Dagster observability', 'Prefect run visibility', 'Semantic Kernel plugin boundary'],
+    decision_ledger: {
+      status: ledgerRows.length ? 'active' : 'empty',
+      path: path.relative(ROOT, decisionLedgerPath(date)),
+      records: ledgerRows.length,
+      expected_records: allocationRows.length,
+      coverage: allocationRows.length ? round((ledgerRows.length / allocationRows.length) * 100, 2) : ledgerRows.length ? 100 : 0,
+      last_record_at: ledgerRows[ledgerRows.length - 1]?.generated_at || null,
+    },
+    contract_validation: {
+      status: contractValidationStep?.validation_result || 'unknown',
+      last_run_at: contractValidationStep?.ended_at || null,
+    },
+    policy_gates: {
+      total: policyGates.length,
+      active: policyGates.filter((gate) => gate.status === 'active').length,
+      passed: policyGates.filter((gate) => gate.status === 'passed').length,
+      by_code: countBy(policyGates, 'code'),
+    },
+    decision_trace: {
+      available: decisionTrace.length > 0,
+      nodes: decisionTrace.map((node) => node.node),
+      node_count: decisionTrace.length,
+    },
+    outcome_attribution: {
+      status: outcomeAttribution ? 'available' : 'missing',
+      decisions: outcomeAttribution?.decisions || 0,
+      complete: outcomeAttribution?.complete || 0,
+      pending_result: outcomeAttribution?.pending_result || 0,
+      no_result_found: outcomeAttribution?.no_result_found || 0,
+      profit_loss_proxy: outcomeAttribution?.profit_loss_proxy || 0,
+      coverage: ledgerRows.length ? round(((outcomeRows.length || 0) / ledgerRows.length) * 100, 2) : 0,
+    },
+    policy_feedback: {
+      status: policyFeedback ? 'available' : 'missing',
+      recommendations: recommendations.length,
+      recommendations_by_status: countBy(recommendations, 'status'),
+      report_path: policyFeedback ? path.join('mlb_ops', 'reports', 'policy_feedback_report.md') : null,
+    },
+    learning_status: {
+      status: outcomeAttribution?.complete > 0 ? 'learning' : ledgerRows.length ? 'collecting_evidence' : 'not_started',
+      rationale: outcomeAttribution?.complete > 0
+        ? 'Completed outcomes are available for learning feedback.'
+        : ledgerRows.length
+          ? 'Decision memory exists, but final outcomes are still pending.'
+          : 'No decision ledger records are available yet.',
+    },
+  };
+}
+
 function buildDecisionPanel() {
   const state = loadCoreState();
   const overview = buildOverview();
@@ -1495,6 +1569,7 @@ function buildDecisionPanel() {
     aggregate_exposure_intelligence: portfolioGovernance.aggregate_exposure_intelligence,
     executive_allocation: executiveAllocation,
     decision_ledger: decisionLedger,
+    learning_observability: buildLearningObservability(state.date, executiveAllocation),
     best_structures: structures,
     timing_persistence: {
       best_window: bestWindow,
@@ -2208,6 +2283,7 @@ function rawArtifact(name) {
     ['research_status', path.join(PROCESSED_DIR, 'research_status.json')],
   ]);
   const target = allowed.get(name);
+  if (name === 'learning_observability') return buildLearningObservability();
   if (!target || !fs.existsSync(target)) return null;
   return readJson(target);
 }
@@ -2215,6 +2291,7 @@ function rawArtifact(name) {
 module.exports = {
   buildDecisionPanel,
   buildDecisionLedgerStatus,
+  buildLearningObservability,
   buildOverview,
   buildResearchWorkspace,
   buildQuantReportMarkdown,

@@ -320,6 +320,7 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
   const primaryAllocation = executive.primary_allocation || resolvePrimaryAllocation(allocationRows);
   const policyGates = executive.policy_gates || [];
   const decisionLedger = data?.decision_ledger || {};
+  const learning = data?.learning_observability || {};
   const topRawEdge = resolveTopRawEdge(structures);
   const topRawEdgeAllocation = findAllocationForStructure(allocationRows, topRawEdge);
   const highConvictionSignals = resolveHighConvictionSignals(allocationRows);
@@ -608,6 +609,33 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
                   <div className="mt-2 text-xs text-slate-400">{gate.effect}</div>
                 </div>
               ))}
+            </div>
+          </PanelFrame>
+
+          <PanelFrame title={t('decision.learningObservability')} subtitle={t('decision.learningObservabilitySubtitle')}>
+            <div className="grid gap-3">
+              <div className="rounded-2xl border border-slate-700/35 bg-slate-950/35 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="mono text-[11px] uppercase tracking-[0.22em] text-slate-500">{t('decision.learningStatus')}</div>
+                    <div className="mt-1 text-sm text-white">{learning.learning_status?.status || 'n/a'}</div>
+                  </div>
+                  <SignalPill tone={learning.learning_status?.status === 'learning' ? 'positive' : learning.learning_status?.status === 'collecting_evidence' ? 'info' : 'warning'}>
+                    {learning.outcome_attribution?.complete ?? 0} / {learning.outcome_attribution?.decisions ?? 0}
+                  </SignalPill>
+                </div>
+                <div className="mt-2 text-xs text-slate-400">{learning.learning_status?.rationale || t('decision.noLearningStatus')}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-slate-700/35 bg-slate-950/35 px-4 py-3">
+                  <div className="mono text-[10px] uppercase tracking-[0.2em] text-slate-500">{t('decision.traceNodes')}</div>
+                  <div className="mt-1 text-sm text-white">{learning.decision_trace?.node_count ?? 0}</div>
+                </div>
+                <div className="rounded-2xl border border-slate-700/35 bg-slate-950/35 px-4 py-3">
+                  <div className="mono text-[10px] uppercase tracking-[0.2em] text-slate-500">{t('decision.feedback')}</div>
+                  <div className="mt-1 text-sm text-white">{learning.policy_feedback?.recommendations ?? 0}</div>
+                </div>
+              </div>
             </div>
           </PanelFrame>
         </>
