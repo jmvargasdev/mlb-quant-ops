@@ -143,6 +143,28 @@ function validateExecutiveAllocationPolicies(executiveAllocation) {
   return errors;
 }
 
+function validateDecisionTrace(executiveAllocation) {
+  const expectedNodes = [
+    'Raw Edge Node',
+    'Temporal Validation Node',
+    'Market Regime Node',
+    'Portfolio Concentration Node',
+    'Policy Gate Node',
+    'Executive Allocation Node',
+    'Decision Ledger Node',
+  ];
+  const actualNodes = (executiveAllocation.decision_trace || []).map((node) => node.node);
+  const errors = [];
+
+  expectedNodes.forEach((node, index) => {
+    if (actualNodes[index] !== node) {
+      errors.push(`executive_allocation.decision_trace[${index}]: expected ${node}, got ${actualNodes[index] || 'missing'}`);
+    }
+  });
+
+  return errors;
+}
+
 function main() {
   const schema = readJson(SCHEMA_PATH);
   const decisionPanel = buildDecisionPanel();
@@ -154,6 +176,7 @@ function main() {
       label: 'executive_allocation',
     }),
     ...validateExecutiveAllocationPolicies(executiveAllocation),
+    ...validateDecisionTrace(executiveAllocation),
   ];
 
   if (errors.length) {
@@ -168,6 +191,7 @@ function main() {
     status: 'passed',
     contracts: ['executive_allocation'],
     policies: executiveAllocation.policy_gates.map((gate) => gate.code),
+    decision_trace_nodes: executiveAllocation.decision_trace.map((node) => node.node),
     allocation_rows: executiveAllocation.allocation_rows.length,
     primary_allocation: executiveAllocation.primary_allocation?.team || null,
   }, null, 2));

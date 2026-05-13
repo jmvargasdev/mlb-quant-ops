@@ -203,6 +203,154 @@ function generateExecutiveMemo({
   };
 }
 
+function buildDecisionTrace({
+  structures,
+  compressed,
+  allocationRows,
+  primaryAllocation,
+  policyGates,
+  aggressionState,
+  deploymentEvaluation,
+  portfolioSummary,
+  concentrationRisk,
+  slateStability,
+  aggregateExposureIntelligence,
+}) {
+  const activeRows = allocationRows.filter((row) => row.executive_exposure_units > 0);
+  const passedRows = allocationRows.filter((row) => row.action === 'Pass');
+  const policyEffects = policyGates
+    .filter((gate) => gate.status === 'active')
+    .map((gate) => gate.effect);
+  const structureReasonCodes = [...new Set(structures.flatMap((row) => row.reason_codes || []))];
+
+  return [
+    {
+      node: 'Raw Edge Node',
+      status: structures.length ? 'completed' : 'empty',
+      input_summary: {
+        structures: structures.length,
+        raw_total_exposure: portfolioSummary?.raw_total_exposure || null,
+      },
+      output_state: {
+        candidate_structures: structures.map((row) => ({
+          game_id: row.game_id,
+          team: row.team,
+          quant_score: row.quant_score ?? null,
+          raw_exposure: row.exposure,
+          conviction_tier: row.conviction_tier,
+        })),
+      },
+      reason_codes: structureReasonCodes,
+      confidence_impact: structures.length ? 'raw_candidates_identified' : 'no_raw_candidates',
+      policy_effects: [],
+    },
+    {
+      node: 'Temporal Validation Node',
+      status: 'completed',
+      input_summary: {
+        candidates: structures.length,
+      },
+      output_state: {
+        timing_sensitive: structures
+          .filter((row) => (row.reason_codes || []).includes('LATE_CONFIRMATION_REQUIRED') || (row.timing_quality_score || 0) < 20)
+          .map((row) => row.team),
+        lifecycle_risk: structures
+          .filter((row) => ['collapsing', 'decaying'].includes(row.lifecycle))
+          .map((row) => row.team),
+      },
+      reason_codes: structureReasonCodes.filter((code) => code.includes('TIMING') || code.includes('DECAY') || code.includes('CONFIRMATION')),
+      confidence_impact: 'timing_and_persistence_adjusted',
+      policy_effects: compressed
+        .flatMap((row) => row.policy_gates || [])
+        .filter((gate) => gate.code === 'LOW_TIMING_REQUIRES_CONFIRMATION' && gate.status === 'active')
+        .map((gate) => gate.effect),
+    },
+    {
+      node: 'Market Regime Node',
+      status: 'completed',
+      input_summary: {
+        slate_stability: slateStability?.state || null,
+        aggregate_volatility_risk: aggregateExposureIntelligence?.aggregate_volatility_risk || null,
+        aggregate_disagreement_risk: aggregateExposureIntelligence?.aggregate_disagreement_risk || null,
+      },
+      output_state: {
+        reduced_quality: allocationRows
+          .filter((row) => row.action === 'Reduced Quality')
+          .map((row) => row.team),
+      },
+      reason_codes: structureReasonCodes.filter((code) => code.includes('VOLATILITY') || code.includes('DISAGREEMENT')),
+      confidence_impact: 'market_regime_penalties_applied',
+      policy_effects: compressed
+        .flatMap((row) => row.policy_gates || [])
+        .filter((gate) => gate.effect === 'downgrade_to_reduced_quality')
+        .map((gate) => gate.effect),
+    },
+    {
+      node: 'Portfolio Concentration Node',
+      status: 'completed',
+      input_summary: {
+        recommended_aggression: portfolioSummary?.recommended_aggression || null,
+        concentration_level: concentrationRisk?.level || null,
+      },
+      output_state: {
+        aggression_state: aggressionState,
+        governed_total_exposure: deploymentEvaluation.governed_total_exposure,
+        compression_from_raw: deploymentEvaluation.compression_from_raw,
+      },
+      reason_codes: [],
+      confidence_impact: 'portfolio_governance_applied',
+      policy_effects: policyEffects,
+    },
+    {
+      node: 'Policy Gate Node',
+      status: policyGates.some((gate) => gate.status === 'active') ? 'active' : 'passed',
+      input_summary: {
+        evaluated_policies: policyGates.length,
+      },
+      output_state: {
+        active_policies: policyGates.filter((gate) => gate.status === 'active').map((gate) => gate.code),
+        passed_policies: policyGates.filter((gate) => gate.status === 'passed').map((gate) => gate.code),
+      },
+      reason_codes: policyGates.map((gate) => gate.code),
+      confidence_impact: policyGates.some((gate) => gate.status === 'active') ? 'deployment_constrained' : 'policy_clear',
+      policy_effects: policyEffects,
+    },
+    {
+      node: 'Executive Allocation Node',
+      status: primaryAllocation ? 'allocated' : 'no_active_allocation',
+      input_summary: {
+        allocation_rows: allocationRows.length,
+      },
+      output_state: {
+        primary_allocation: primaryAllocation ? {
+          game_id: primaryAllocation.game_id,
+          team: primaryAllocation.team,
+          action: primaryAllocation.action,
+          executive_exposure: primaryAllocation.executive_exposure,
+        } : null,
+        active_decisions: activeRows.length,
+        passed_decisions: passedRows.length,
+      },
+      reason_codes: [],
+      confidence_impact: primaryAllocation ? 'capital_decision_selected' : 'capital_preservation',
+      policy_effects: policyEffects,
+    },
+    {
+      node: 'Decision Ledger Node',
+      status: 'ready',
+      input_summary: {
+        rows_ready_for_ledger: allocationRows.length,
+      },
+      output_state: {
+        result_status: 'pending',
+      },
+      reason_codes: [],
+      confidence_impact: 'decision_is_auditable',
+      policy_effects: [],
+    },
+  ];
+}
+
 function generateExecutiveAllocation({
   structures,
   operationalPosture,
@@ -269,6 +417,19 @@ function generateExecutiveAllocation({
     deploymentEvaluation,
     deploymentRisk,
   });
+  const decisionTrace = buildDecisionTrace({
+    structures,
+    compressed,
+    allocationRows,
+    primaryAllocation,
+    policyGates,
+    aggressionState,
+    deploymentEvaluation,
+    portfolioSummary,
+    concentrationRisk,
+    slateStability,
+    aggregateExposureIntelligence,
+  });
 
   return {
     aggression_state: aggressionState,
@@ -277,6 +438,7 @@ function generateExecutiveAllocation({
     allocation_rows: allocationRows,
     primary_allocation: primaryAllocation,
     policy_gates: policyGates,
+    decision_trace: decisionTrace,
     executive_memo: executiveMemo,
   };
 }
@@ -289,5 +451,6 @@ module.exports = {
   evaluateExecutivePolicyGates,
   generateExecutiveAllocation,
   generateExecutiveMemo,
+  buildDecisionTrace,
   selectPrimaryAllocation,
 };

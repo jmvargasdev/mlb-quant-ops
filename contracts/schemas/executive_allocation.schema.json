@@ -9,7 +9,8 @@
     "deployment_evaluation",
     "allocation_rows",
     "executive_memo",
-    "policy_gates"
+    "policy_gates",
+    "decision_trace"
   ],
   "properties": {
     "aggression_state": {
@@ -85,6 +86,12 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/policy_gate"
+      }
+    },
+    "decision_trace": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/decision_trace_node"
       }
     }
   },
@@ -193,6 +200,58 @@
         "context": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "decision_trace_node": {
+      "type": "object",
+      "required": [
+        "node",
+        "status",
+        "input_summary",
+        "output_state",
+        "reason_codes",
+        "confidence_impact",
+        "policy_effects"
+      ],
+      "properties": {
+        "node": {
+          "type": "string",
+          "enum": [
+            "Raw Edge Node",
+            "Temporal Validation Node",
+            "Market Regime Node",
+            "Portfolio Concentration Node",
+            "Policy Gate Node",
+            "Executive Allocation Node",
+            "Decision Ledger Node"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input_summary": {
+          "type": "object"
+        },
+        "output_state": {
+          "type": "object"
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "confidence_impact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_effects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     }
