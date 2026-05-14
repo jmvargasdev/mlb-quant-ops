@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+require('../../config/runtime').getRuntimeConfig();
 const { appendDailyEvent, loadBootstrapRecord, writeBootstrapRecord, writeDailyRunRecord } = require('./ops_history');
 const { getOperationalDateTimeParts } = require('./lib/operational-date');
 const { buildOperationalChecklist } = require('./lib/operational-hardening');
