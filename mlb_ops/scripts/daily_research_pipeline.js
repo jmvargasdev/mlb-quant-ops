@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { getOperationalDate } = require('./lib/operational-date');
+const { chat, isAvailable, MODELS } = require('../../config/ollama');
 
 const OPS_ROOT = path.resolve(__dirname, '..');
 const PROCESSED_DIR = path.join(OPS_ROOT, 'processed');
@@ -409,6 +410,37 @@ function buildReport(persistence, timing, clv, memory, validation) {
   return lines.join('\n');
 }
 
+async function enrichReportWithNarrative(researchBundle, reportText) {
+  if (!(await isAvailable())) return reportText;
+
+  const stats = {
+    edge_survival_rate: researchBundle.persistence_research?.edge_survival_rate,
+    edge_collapse_rate: researchBundle.persistence_research?.edge_collapse_rate,
+    avg_persistence_score: researchBundle.persistence_research?.average_edge_persistence_score,
+    avg_half_life_hours: researchBundle.persistence_research?.average_edge_half_life_hours,
+    best_timing_windows: researchBundle.timing_research?.best_window_by_average_timing?.slice(0, 3),
+    avg_timing_quality: researchBundle.timing_research?.average_timing_quality_score,
+    volatility_regimes: researchBundle.market_memory?.volatility_regimes,
+    stable_markets: researchBundle.market_memory?.stable_markets,
+    unstable_markets: researchBundle.market_memory?.unstable_markets,
+    sharp_movement_count: researchBundle.market_memory?.sharp_movement_timing_count,
+  };
+
+  const systemPrompt = `You are a quantitative research analyst for MLB game-day markets.
+Write a 3-4 sentence research narrative interpreting the following summary statistics.
+Identify the dominant market pattern, note any significant edge persistence or timing signal, and state what this implies for today's deployment decision.
+Respond with the narrative only — no headers, no lists, no markdown formatting.`;
+
+  const raw = await chat(MODELS.reason, [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: JSON.stringify(stats, null, 2) },
+  ]);
+
+  const narrative = raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  if (!narrative) return reportText;
+  return `## Research Narrative\n\n${narrative}\n\n---\n\n${reportText}`;
+}
+
 function appendHistoricalMemory(bundle) {
   ensureDir(HISTORY_DIR);
   appendLine(HISTORY_INDEX_PATH, JSON.stringify({
@@ -421,7 +453,7 @@ function appendHistoricalMemory(bundle) {
   }));
 }
 
-function main() {
+async function main() {
   if (process.env.RUN_REPLAY !== 'false' && !fs.existsSync(REPLAY_DATA_PATH)) {
     execFileSync('node', [path.join(OPS_ROOT, 'scripts', 'replay_engine.js')], {
       cwd: path.resolve(OPS_ROOT, '..'),
@@ -488,7 +520,8 @@ function main() {
   });
 
   const report = buildReport(persistenceResearch, timingResearch, clvEnriched, memory, edgeValidation || { records: [] });
-  writeText(RESEARCH_REPORT_PATH, report);
+  const enrichedReport = await enrichReportWithNarrative(researchBundle, report);
+  writeText(RESEARCH_REPORT_PATH, enrichedReport);
 
   console.log(JSON.stringify({
     outputs: [
@@ -504,4 +537,4 @@ function main() {
   }, null, 2));
 }
 
-main();
+main().catch((err) => { console.error(err.message); process.exit(1); });

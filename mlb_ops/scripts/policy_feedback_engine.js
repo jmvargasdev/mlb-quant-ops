@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { chat, isAvailable, MODELS } = require('../../config/ollama');
 
 const OPS_ROOT = path.resolve(__dirname, '..');
 const ROOT = path.resolve(OPS_ROOT, '..');
@@ -170,7 +171,34 @@ function buildReport(feedback) {
   return lines.join('\n');
 }
 
-function main() {
+async function generatePolicyNarrative(feedback) {
+  if (!(await isAvailable())) return null;
+
+  const stats = {
+    total_decisions: feedback.summary.decisions,
+    complete_outcomes: feedback.summary.complete,
+    pending_outcomes: feedback.summary.pending,
+    overall_accuracy: feedback.summary.accuracy,
+    profit_loss_proxy: feedback.summary.profit_loss_proxy,
+    by_action: feedback.by_action.map((r) => ({ action: r.action, accuracy: r.accuracy, profit_loss_proxy: r.profit_loss_proxy })),
+    by_conviction_tier: feedback.by_conviction_tier.map((r) => ({ tier: r.conviction_tier, accuracy: r.accuracy, profit_loss_proxy: r.profit_loss_proxy })),
+    recommendations: feedback.recommendations,
+  };
+
+  const systemPrompt = `You are a quantitative policy analyst reviewing a betting system's decision history.
+Write a 3-4 sentence narrative that identifies the strongest performance signal (what's working and why),
+the weakest signal (what's failing and what it means), and whether the current policy warrants adjustment or continued observation.
+Respond with the narrative only — no headers, no lists.`;
+
+  const raw = await chat(MODELS.reason, [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: JSON.stringify(stats, null, 2) },
+  ]);
+
+  return raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim() || null;
+}
+
+async function main() {
   const current = readJsonIfExists(path.join(PROCESSED_DIR, 'outcome_attribution.json'));
   const historicalRows = loadHistoricalRows();
   const currentRows = current?.rows || [];
@@ -203,7 +231,13 @@ function main() {
   };
 
   writeJson(PROCESSED_OUTPUT, feedback);
-  writeText(REPORT_OUTPUT, buildReport(feedback));
+
+  const narrative = await generatePolicyNarrative(feedback);
+  const report = buildReport(feedback);
+  const finalReport = narrative
+    ? `## Policy Narrative\n\n${narrative}\n\n---\n\n${report}`
+    : report;
+  writeText(REPORT_OUTPUT, finalReport);
 
   console.log(JSON.stringify({
     date: DATE,
@@ -215,4 +249,4 @@ function main() {
   }, null, 2));
 }
 
-main();
+main().catch((err) => { console.error(err.message); process.exit(1); });
