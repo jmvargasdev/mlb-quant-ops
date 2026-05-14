@@ -7,6 +7,7 @@ export default function WorkspaceSidebar({ activeWorkspace, onChange, overview, 
   const { t } = useLanguage();
   const games = overview?.game_index || [];
   const isAllocationWorkspace = activeWorkspace === 'decision-panel';
+  const isHomeWorkspace = activeWorkspace === 'home';
   const workspaces = WORKSPACE_DEFINITIONS.map((workspace) => localizeWorkspace(workspace, t));
   const scheduleTiming = overview?.meta?.schedule_timing || {};
   const processUpdatedAt = scheduleTiming.process_updated_at || overview?.meta?.generated_at || null;
@@ -33,24 +34,34 @@ export default function WorkspaceSidebar({ activeWorkspace, onChange, overview, 
               activeWorkspace === workspace.id
                 ? 'border-sky-300/50 bg-sky-300/8'
                 : 'border-slate-700/35 bg-slate-900/30 hover:border-slate-500/45'
-            }`}
+            } ${workspace.id === 'home' ? 'px-2.5 py-2' : ''}`}
           >
             <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold text-white">{workspace.label}</div>
-              <div className="mono text-[10px] uppercase tracking-[0.2em] text-slate-500">{workspace.shortLabel}</div>
+              <div className={`font-semibold text-white ${workspace.id === 'home' ? 'text-[13px]' : 'text-sm'}`}>{workspace.label}</div>
+              <div className={`mono uppercase tracking-[0.2em] text-slate-500 ${workspace.id === 'home' ? 'text-[9px]' : 'text-[10px]'}`}>{workspace.shortLabel}</div>
             </div>
-            <div className="mt-1 text-xs text-slate-400">{workspace.description}</div>
+            {workspace.id === 'home' ? (
+              <div className="mt-1 text-[11px] leading-snug text-slate-400">
+                {workspace.description}
+              </div>
+            ) : (
+              <div className="mt-1 text-xs text-slate-400">{workspace.description}</div>
+            )}
           </button>
         ))}
       </nav>
 
       <div className="mt-5 border-t border-slate-700/40 pt-4">
         <div className="mono text-[11px] uppercase tracking-[0.25em] text-slate-500">
-          {isAllocationWorkspace ? t('app.allocationContext') : t('app.focusGame')}
+          {isAllocationWorkspace ? t('app.allocationContext') : isHomeWorkspace ? t('app.homeContext') : t('app.focusGame')}
         </div>
         {isAllocationWorkspace ? (
           <div className="mt-3 rounded-2xl border border-sky-300/20 bg-sky-300/6 px-3 py-3 text-sm text-slate-300">
             {t('app.allocationContextDescription')}
+          </div>
+        ) : isHomeWorkspace ? (
+          <div className="mt-3 rounded-2xl border border-slate-700/35 bg-slate-950/35 px-3 py-3 text-sm text-slate-300">
+            {t('app.homeContextDescription')}
           </div>
         ) : (
           <select

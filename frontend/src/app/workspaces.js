@@ -1,5 +1,12 @@
 export const WORKSPACE_DEFINITIONS = [
   {
+    id: 'home',
+    labelKey: 'workspace.home.label',
+    shortLabelKey: 'workspace.home.short',
+    questionKey: 'workspace.home.question',
+    descriptionKey: 'workspace.home.description',
+  },
+  {
     id: 'decision-panel',
     labelKey: 'workspace.decision.label',
     shortLabelKey: 'workspace.decision.short',

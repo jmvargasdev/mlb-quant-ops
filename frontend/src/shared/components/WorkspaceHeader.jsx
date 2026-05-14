@@ -27,12 +27,18 @@ export default function WorkspaceHeader({ workspace, overview, status, detail })
   const { t } = useLanguage();
   const card = detail?.card || null;
   const isAllocationWorkspace = workspace?.id === 'decision-panel';
+  const isHomeWorkspace = workspace?.id === 'home';
   const scheduleTiming = overview?.meta?.schedule_timing || {};
   const processUpdatedAt = scheduleTiming.process_updated_at || overview?.meta?.generated_at || status?.lastUpdated || null;
   const latestSnapshotAt = scheduleTiming.last_snapshot_captured_at || overview?.meta?.latest_snapshot_time || status?.latestSnapshotAt || null;
+  const currentDateLabel = new Date().toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
   return (
     <header className="panel panel-strong rounded-3xl px-5 py-5">
-      {!isAllocationWorkspace && (
+      {!isAllocationWorkspace && !isHomeWorkspace && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <span className="mono rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-emerald-200">
             {t('app.lastProcessUpdate')}: {timestampFull(processUpdatedAt)}
@@ -51,14 +57,46 @@ export default function WorkspaceHeader({ workspace, overview, status, detail })
       )}
       <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <div className="mono text-[11px] uppercase tracking-[0.35em] text-sky-300/75">{workspace.label}</div>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white xl:text-3xl">{workspace.question}</h1>
-          <p className="mt-2 max-w-3xl text-sm text-slate-300">{workspace.description}</p>
+          {isHomeWorkspace ? (
+            <>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white xl:text-3xl">
+                {t('home.eyebrow')}
+              </h1>
+              <div className="mt-2 mono text-[10px] uppercase tracking-[0.22em] text-slate-500">
+                {currentDateLabel}
+              </div>
+              <div className="mt-3 inline-flex rounded-xl border border-slate-700/45 bg-slate-950/55 p-1">
+                {['MLB', 'NBA', 'NHL'].map((sport, index) => (
+                  <button
+                    key={sport}
+                    type="button"
+                    disabled={sport !== 'MLB'}
+                    className={`mono rounded-lg px-3 py-1 text-[10px] uppercase tracking-[0.18em] transition ${
+                      sport === 'MLB'
+                        ? 'bg-sky-300/15 text-sky-100'
+                        : 'text-slate-500 opacity-60'
+                    } ${index > 0 ? 'ml-1' : ''}`}
+                    title={sport === 'MLB' ? 'Current sport' : 'Placeholder'}
+                  >
+                    {sport}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="mono text-[11px] uppercase tracking-[0.35em] text-sky-300/75">{workspace.label}</div>
+          )}
+          {!isHomeWorkspace && (
+            <>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white xl:text-3xl">{workspace.question}</h1>
+              <p className="mt-2 max-w-3xl text-sm text-slate-300">{workspace.description}</p>
+            </>
+          )}
         </div>
         <div className="flex flex-col gap-3 xl:items-end">
           <LanguageToggle />
 
-          {!isAllocationWorkspace && (
+          {!isAllocationWorkspace && !isHomeWorkspace && (
           <div className="grid gap-3 text-sm text-slate-300 sm:grid-cols-2 xl:min-w-[530px]">
             <div>
               <div className="mono text-[11px] uppercase tracking-[0.25em] text-slate-500">{t('header.lastRefresh')}</div>
@@ -97,7 +135,7 @@ export default function WorkspaceHeader({ workspace, overview, status, detail })
         </div>
       )}
 
-      {!isAllocationWorkspace && card && (
+      {!isAllocationWorkspace && !isHomeWorkspace && card && (
         <div className="mt-5 grid gap-3 border-t border-slate-700/35 pt-4 md:grid-cols-2 xl:grid-cols-4">
           <div>
             <div className="mono text-[11px] uppercase tracking-[0.25em] text-slate-500">{t('header.selection')}</div>

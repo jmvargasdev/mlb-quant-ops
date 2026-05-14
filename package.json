@@ -24,7 +24,9 @@
     "mlb:research": "node mlb_ops/scripts/daily_research_pipeline.js",
     "mlb:ops": "node mlb_ops/scripts/daily_operations_orchestrator.js",
     "mlb:bootstrap": "node mlb_ops/scripts/daily_system_bootstrap.js",
-    "journal:sync": "node mlb_ops/scripts/journal_sync.js"
+    "journal:sync": "node mlb_ops/scripts/journal_sync.js",
+    "ollama:status": "node -e \"require('./config/ollama').listModels().then(m => console.log(m.join('\\n'))).catch(e => console.error(e.message))\"",
+    "ollama:extract": "node mlb_ops/scripts/ollama_extract.js"
   },
   "keywords": [],
   "author": "",

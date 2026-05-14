@@ -11,11 +11,14 @@ import ReplayWorkspace from '../features/replay/ReplayWorkspace';
 import OpsHealthWorkspace from '../features/ops-health/OpsHealthWorkspace';
 import ResearchWorkspace from '../workspaces/research/ResearchWorkspace';
 import DecisionPanelWorkspace from '../workspaces/decision-panel/DecisionPanelWorkspace';
+import HomeWorkspace from '../workspaces/home/HomeWorkspace';
 import { fmt, timeAgo } from '../shared/lib/formatters';
 import { useLanguage } from '../shared/i18n/LanguageProvider';
 
-function WorkspaceRenderer({ workspaceId, overview, detail, onSelectGame, status }) {
+function WorkspaceRenderer({ workspaceId, overview, detail, onSelectGame, onChangeWorkspace, status }) {
   switch (workspaceId) {
+    case 'home':
+      return <HomeWorkspace overview={overview} status={status} onNavigate={onChangeWorkspace} />;
     case 'decision-panel':
       return <DecisionPanelWorkspace overview={overview} status={status} active />;
     case 'daily-ops':
@@ -39,6 +42,7 @@ export default function App() {
   const safeOverview = overview || {
     meta: {},
     metrics: [],
+    performance_dashboard: {},
     sections: {
       top_bettable: [],
       watchlist: [],
@@ -80,34 +84,36 @@ export default function App() {
 
   return (
     <div className="min-h-screen px-4 py-4 sm:px-5 lg:px-6">
-      <div className="mx-auto mb-4 max-w-[2000px]">
-        <section className="panel panel-strong rounded-2xl border border-slate-700/40 px-4 py-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="mono rounded-full border border-emerald-300/25 bg-emerald-300/8 px-3 py-1 uppercase tracking-[0.18em] text-emerald-200">
-              {t('app.pipelineHealth')}: {fmt(pipelineHealth, 1)}
-            </span>
-            <span className="mono rounded-full border border-sky-300/25 bg-sky-300/8 px-3 py-1 uppercase tracking-[0.18em] text-sky-200">
-              {t('app.snapshotDensity')}: {fmt(snapshotDensity, 1)}
-            </span>
-            <SnapshotFreshness at={latestSnapshotAt} scheduleTiming={scheduleTiming} compact />
-            <span className="mono rounded-full border border-slate-500/30 bg-slate-800/60 px-3 py-1 uppercase tracking-[0.18em] text-slate-200">
-              {t('app.lastProcessUpdate')}: {timeAgo(processUpdatedAt)}
-            </span>
-            <span className="mono rounded-full border border-slate-500/30 bg-slate-800/60 px-3 py-1 uppercase tracking-[0.18em] text-slate-200">
-              {t('app.nextSnapshot')}: {nextScheduledSnapshot}
-            </span>
-            <span className="mono rounded-full border border-slate-500/30 bg-slate-800/60 px-3 py-1 uppercase tracking-[0.18em] text-slate-200">
-              {t('app.refresh')}: {refreshProfile}
-            </span>
-          </div>
-        </section>
-      </div>
+      {workspaceId !== 'home' && (
+        <div className="mx-auto mb-4 max-w-[2000px]">
+          <section className="panel panel-strong rounded-2xl border border-slate-700/40 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="mono rounded-full border border-emerald-300/25 bg-emerald-300/8 px-3 py-1 uppercase tracking-[0.18em] text-emerald-200">
+                {t('app.pipelineHealth')}: {fmt(pipelineHealth, 1)}
+              </span>
+              <span className="mono rounded-full border border-sky-300/25 bg-sky-300/8 px-3 py-1 uppercase tracking-[0.18em] text-sky-200">
+                {t('app.snapshotDensity')}: {fmt(snapshotDensity, 1)}
+              </span>
+              <SnapshotFreshness at={latestSnapshotAt} scheduleTiming={scheduleTiming} compact />
+              <span className="mono rounded-full border border-slate-500/30 bg-slate-800/60 px-3 py-1 uppercase tracking-[0.18em] text-slate-200">
+                {t('app.lastProcessUpdate')}: {timeAgo(processUpdatedAt)}
+              </span>
+              <span className="mono rounded-full border border-slate-500/30 bg-slate-800/60 px-3 py-1 uppercase tracking-[0.18em] text-slate-200">
+                {t('app.nextSnapshot')}: {nextScheduledSnapshot}
+              </span>
+              <span className="mono rounded-full border border-slate-500/30 bg-slate-800/60 px-3 py-1 uppercase tracking-[0.18em] text-slate-200">
+                {t('app.refresh')}: {refreshProfile}
+              </span>
+            </div>
+          </section>
+        </div>
+      )}
 
       <div className="mx-auto grid max-w-[2000px] gap-5 lg:grid-cols-[290px_minmax(0,1fr)]">
-        <WorkspaceSidebar
-          activeWorkspace={workspaceId}
-          onChange={setWorkspaceId}
-          overview={safeOverview}
+          <WorkspaceSidebar
+            activeWorkspace={workspaceId}
+            onChange={setWorkspaceId}
+            overview={safeOverview}
           gameId={focusedGameId}
           onSelectGame={setFocusedGameId}
         />
@@ -119,6 +125,7 @@ export default function App() {
             overview={safeOverview}
             detail={detail}
             onSelectGame={setFocusedGameId}
+            onChangeWorkspace={setWorkspaceId}
             status={status}
           />
         </main>

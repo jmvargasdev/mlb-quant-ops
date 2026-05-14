@@ -6,8 +6,12 @@ const LanguageContext = createContext(null);
 
 function getInitialLanguage() {
   if (typeof window === 'undefined') return 'en';
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  return stored === 'es' || stored === 'en' ? stored : 'en';
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    return stored === 'es' || stored === 'en' ? stored : 'en';
+  } catch {
+    return 'en';
+  }
 }
 
 export function LanguageProvider({ children }) {
@@ -16,7 +20,11 @@ export function LanguageProvider({ children }) {
   function setLanguage(nextLanguage) {
     const normalized = nextLanguage === 'es' ? 'es' : 'en';
     setLanguageState(normalized);
-    window.localStorage.setItem(STORAGE_KEY, normalized);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, normalized);
+    } catch {
+      void 0;
+    }
   }
 
   const value = useMemo(() => ({
