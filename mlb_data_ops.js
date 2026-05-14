@@ -18,6 +18,15 @@ const SCRIPTS_DIR = path.join(OPS_ROOT, 'scripts');
 const RAW_RUN_DIR = path.join(RAW_DIR, DATE, RUN_TS);
 const SCREENSHOT_RUN_DIR = path.join(SCREENSHOTS_DIR, DATE);
 const EXTRACTION_LOG_PATH = path.join(LOGS_DIR, 'extraction_log.txt');
+const SOURCE_HEALTH_HISTORY_PATH = path.join(LOGS_DIR, 'source_health_history.jsonl');
+
+const SOURCE_VOLUME_THRESHOLDS = {
+  'MLB Stats API':    { min_rows: 1 },
+  'Baseball Savant': { min_rows: 5 },
+  'Rotowire':        { min_rows: 5 },
+  'Covers':          { min_rows: 1 },
+  'Open-Meteo':      { min_rows: 1 },
+};
 
 const TEAM_ABBR_FIXES = {
   ARI: 'AZ',
@@ -97,14 +106,41 @@ function appendLog(line) {
 
 function recordSourceEvent(source, status, detail, extra = {}) {
   if (!state.sourceHealth.has(source)) {
-    state.sourceHealth.set(source, { source, status: 'unknown', successes: 0, failures: 0, events: [] });
+    state.sourceHealth.set(source, { source, status: 'unknown', successes: 0, failures: 0, empty: 0, rows_last_run: null, events: [] });
   }
   const row = state.sourceHealth.get(source);
-  row.status = status;
-  if (status === 'ok') row.successes += 1;
-  if (status === 'failed') row.failures += 1;
-  row.events.push({ at: new Date().toISOString(), status, detail, ...extra });
-  appendLog(`${source} | ${status.toUpperCase()} | ${detail}`);
+  const rows = extra.rows ?? null;
+  const threshold = SOURCE_VOLUME_THRESHOLDS[source];
+  const isEmpty = status === 'ok' && threshold && rows !== null && rows < threshold.min_rows;
+
+  row.rows_last_run = rows;
+  if (status === 'failed') {
+    row.status = 'failed';
+    row.failures += 1;
+  } else if (isEmpty) {
+    row.status = 'ok_empty';
+    row.empty += 1;
+  } else {
+    row.status = 'ok';
+    row.successes += 1;
+  }
+  row.events.push({ at: new Date().toISOString(), status: row.status, detail, rows, ...extra });
+  appendLog(`${source} | ${row.status.toUpperCase()} | ${detail}`);
+}
+
+function persistSourceHealthHistory() {
+  ensureDir(LOGS_DIR);
+  const entry = {
+    date: DATE,
+    run_at: new Date().toISOString(),
+    sources: [...state.sourceHealth.values()].map((row) => ({
+      source: row.source,
+      status: row.status,
+      rows: row.rows_last_run,
+      populated: row.status === 'ok',
+    })),
+  };
+  fs.appendFileSync(SOURCE_HEALTH_HISTORY_PATH, `${JSON.stringify(entry)}\n`);
 }
 
 function writeJson(filePath, value) {
@@ -293,6 +329,12 @@ function decimalToAmerican(decimalOdd) {
   if (!decimalOdd || decimalOdd <= 1) return null;
   if (decimalOdd >= 2) return Math.round((decimalOdd - 1) * 100);
   return -Math.round(100 / (decimalOdd - 1));
+}
+
+function americanToDecimal(american) {
+  const n = Number(american);
+  if (!n || Number.isNaN(n)) return null;
+  return n > 0 ? round((n / 100) + 1, 4) : round((100 / Math.abs(n)) + 1, 4);
 }
 
 function parseMoneyline(value) {
@@ -707,16 +749,17 @@ async function scrapeCoversOdds(browser) {
   for (const block of blocks) {
     const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
     const abbrs = lines.filter((line) => /^[A-Z]{2,4}$/.test(line));
-    const decimals = lines.filter((line) => /^\d+\.\d+$/.test(line)).map(Number);
-    if (abbrs.length < 2 || decimals.length < 2) continue;
+    // Page renders American odds (+153 / -171). First pair = opening line, second pair = first current book.
+    const american = lines.filter((line) => /^[+-]\d+$/.test(line)).map(Number);
+    if (abbrs.length < 2 || american.length < 2) continue;
     games.push({
       time_et: lines[0],
       away_abbr: normalizeTeamAbbr(abbrs[0]),
       home_abbr: normalizeTeamAbbr(abbrs[1]),
-      open_decimal_away: decimals[0],
-      open_decimal_home: decimals[1],
-      current_decimal_away: decimals[2] ?? null,
-      current_decimal_home: decimals[3] ?? null,
+      open_decimal_away: americanToDecimal(american[0]),
+      open_decimal_home: americanToDecimal(american[1]),
+      current_decimal_away: americanToDecimal(american[2] ?? american[0]),
+      current_decimal_home: americanToDecimal(american[3] ?? american[1]),
     });
   }
   return games;
@@ -1105,7 +1148,7 @@ async function main() {
       fetchJson(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${DATE}&hydrate=probablePitcher,team,venue`),
       loadSavantTables(),
     ]);
-    recordSourceEvent('MLB Stats API', 'ok', `Loaded ${scheduleData.dates?.[0]?.games?.length || 0} scheduled games.`, { endpoint: '/api/v1/schedule' });
+    recordSourceEvent('MLB Stats API', 'ok', `Loaded ${scheduleData.dates?.[0]?.games?.length || 0} scheduled games.`, { endpoint: '/api/v1/schedule', rows: scheduleData.dates?.[0]?.games?.length || 0 });
     recordSourceEvent('Baseball Savant', 'ok', 'Loaded expected statistics and statcast CSV tables.', {
       endpoints: [
         '/leaderboard/expected_statistics?type=pitcher&csv=true',
@@ -1119,13 +1162,13 @@ async function main() {
     let coversList = [];
     try {
       rotowireList = await scrapeRotowire(browser);
-      recordSourceEvent('Rotowire', 'ok', `Scraped ${rotowireList.length} lineup cards.`, { url: 'https://www.rotowire.com/baseball/daily-lineups.php' });
+      recordSourceEvent('Rotowire', 'ok', `Scraped ${rotowireList.length} lineup cards.`, { url: 'https://www.rotowire.com/baseball/daily-lineups.php', rows: rotowireList.length });
     } catch (error) {
       recordSourceEvent('Rotowire', 'failed', error.message, { url: 'https://www.rotowire.com/baseball/daily-lineups.php' });
     }
     try {
       coversList = await scrapeCoversOdds(browser);
-      recordSourceEvent('Covers', 'ok', `Scraped ${coversList.length} market rows.`, { url: 'https://www.covers.com/sport/baseball/mlb/odds' });
+      recordSourceEvent('Covers', 'ok', `Scraped ${coversList.length} market rows.`, { url: 'https://www.covers.com/sport/baseball/mlb/odds', rows: coversList.length });
     } catch (error) {
       recordSourceEvent('Covers', 'failed', error.message, { url: 'https://www.covers.com/sport/baseball/mlb/odds' });
     }
@@ -1134,6 +1177,7 @@ async function main() {
       parkFactors = await scrapeParkFactors(browser);
       recordSourceEvent('Baseball Savant', 'ok', `Scraped ${parkFactors.size} park factor rows with Playwright fallback.`, {
         url: `https://baseballsavant.mlb.com/leaderboard/statcast-park-factors?year=${YEAR}`,
+        rows: parkFactors.size,
       });
     } catch (error) {
       recordSourceEvent('Baseball Savant', 'failed', `Park factor scrape failed: ${error.message}`, {
@@ -1422,6 +1466,7 @@ async function main() {
     writeJson(path.join(RAW_RUN_DIR, 'final_dataset.json'), jsonPayload);
     writeText(path.join(LOGS_DIR, `${DATE}_extraction_log.txt`), state.logLines.join('\n') + '\n');
     fs.appendFileSync(EXTRACTION_LOG_PATH, state.logLines.join('\n') + '\n');
+    persistSourceHealthHistory();
 
     writeJson(path.join(ROOT, 'mlb_matchups_today.json'), jsonPayload);
     writeText(path.join(ROOT, 'mlb_matchups_today.csv'), csvText);

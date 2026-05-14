@@ -237,19 +237,47 @@ function snapshotDensityMetrics(temporal) {
   };
 }
 
+function loadSourceHealthHistory(days = 7) {
+  const historyPath = path.join(LOGS_DIR, 'source_health_history.jsonl');
+  if (!fs.existsSync(historyPath)) return [];
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+  return fs.readFileSync(historyPath, 'utf8')
+    .split('\n').filter(Boolean)
+    .map((line) => { try { return JSON.parse(line); } catch { return null; } })
+    .filter((entry) => entry && entry.run_at >= cutoff);
+}
+
 function sourceReliability(latest) {
-  const rows = latest?.meta?.source_health || [];
-  const perSource = rows.map((row) => {
-    const total = (row.successes || 0) + (row.failures || 0);
-    const reliability = total ? row.successes / total : 0;
+  const currentRows = latest?.meta?.source_health || [];
+  const history = loadSourceHealthHistory(7);
+
+  const perSource = currentRows.map((row) => {
+    const total = (row.successes || 0) + (row.failures || 0) + (row.empty || 0);
+    const httpRate = total ? (row.successes + (row.empty || 0)) / total : 0;
+
+    // Historical data quality: populated runs / total runs in last 7 days
+    const sourceHistory = history.flatMap((entry) =>
+      entry.sources.filter((s) => s.source === row.source),
+    );
+    const totalRuns = sourceHistory.length;
+    const populatedRuns = sourceHistory.filter((s) => s.populated).length;
+    const dataQualityScore = totalRuns ? round((populatedRuns / totalRuns) * 100, 1) : null;
+
     return {
       source: row.source,
       status: row.status,
+      rows_last_run: row.rows_last_run ?? null,
       successes: row.successes || 0,
       failures: row.failures || 0,
-      reliability_score: round(reliability * 100, 2),
+      empty: row.empty || 0,
+      http_success_rate: round(httpRate * 100, 1),
+      data_quality_score: dataQualityScore,
+      populated_runs_7d: populatedRuns,
+      total_runs_7d: totalRuns,
+      reliability_score: dataQualityScore ?? round(httpRate * 100, 1),
     };
   });
+
   return {
     score: round(average(perSource.map((row) => row.reliability_score)) || 0, 2),
     rows: perSource,
