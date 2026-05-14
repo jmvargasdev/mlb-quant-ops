@@ -1,4 +1,5 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { useExecuteNowAlert } from './useExecuteNowAlert';
 import CompactStatGrid from '../../shared/components/CompactStatGrid';
 import PanelFrame from '../../shared/components/PanelFrame';
 import SignalPill from '../../shared/components/SignalPill';
@@ -451,6 +452,21 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
   const refreshMs = overview?.meta?.refresh_policy?.interval_ms || 120000;
   const { data, status: panelStatus } = useDecisionPanel(active, refreshMs);
 
+  const [alertBanner, setAlertBanner] = useState(null);
+  const bannerTimerRef = useRef(null);
+
+  const handleNewSignals = useCallback((signals) => {
+    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    setAlertBanner(signals);
+    bannerTimerRef.current = setTimeout(() => setAlertBanner(null), 12000);
+  }, []);
+
+  const allocationRows = data?.executive_allocation?.allocation_rows || [];
+  const alertDate = data?.meta?.date || null;
+
+  useExecuteNowAlert(allocationRows, alertDate, handleNewSignals);
+  useEffect(() => () => { if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current); }, []);
+
   if (panelStatus.loading && !data) {
     return (
       <PanelFrame title={t('decision.title')} subtitle={t('decision.subtitle')}>
@@ -479,7 +495,6 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
   const executive = data?.executive_allocation || {};
   const executiveMemo = executive.executive_memo || {};
   const deployment = executive.deployment_evaluation || {};
-  const allocationRows = executive.allocation_rows || [];
   const structures = data?.best_structures || [];
   const primaryAllocation = executive.primary_allocation || resolvePrimaryAllocation(allocationRows);
   const policyGates = executive.policy_gates || [];
@@ -499,6 +514,29 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
     <WorkspaceShell
       main={
         <>
+          {alertBanner && (
+            <div className="rounded-2xl border border-emerald-400/40 bg-emerald-400/10 px-5 py-4 animate-pulse">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="mono text-[11px] uppercase tracking-[0.3em] text-emerald-300">Execute Now</div>
+                  <div className="mt-1 flex flex-wrap gap-3">
+                    {alertBanner.map((s) => (
+                      <span key={`${s.game_id}:${s.side}`} className="text-sm font-semibold text-white">
+                        {s.team} — {s.executive_exposure} · {s.conviction_tier}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAlertBanner(null)}
+                  className="mono text-[10px] uppercase tracking-widest text-emerald-400 hover:text-white"
+                >
+                  dismiss
+                </button>
+              </div>
+            </div>
+          )}
           <PanelFrame
             title={t('decision.title')}
             subtitle={t('decision.subtitle')}
