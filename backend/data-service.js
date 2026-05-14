@@ -304,6 +304,9 @@ function buildGameCard(scoredGame, maps) {
     close_snapshot_missing: clv?.needs_close_snapshot ?? true,
     timing_quality_score: clv?.timing_quality_score ?? null,
     replay_snapshot_count: replay?.snapshot_count ?? timeline?.snapshots?.length ?? 0,
+    component_scores: scoredGame.scoring?.[bestEdge.side]?.component_scores ?? null,
+    component_weights: scoredGame.scoring?.[bestEdge.side]?.component_weights ?? null,
+    component_explanations: scoredGame.scoring?.[bestEdge.side]?.component_explanations ?? null,
   };
 }
 
@@ -1412,6 +1415,132 @@ function buildLearningObservability(date = loadCoreState().date, executiveAlloca
   };
 }
 
+function summarizeOutcomeRows(rows) {
+  const completeRows = rows.filter((row) => row.attribution_status === 'complete');
+  const correct = completeRows.filter((row) => row.was_action_correct === true).length;
+  const incorrect = completeRows.filter((row) => row.was_action_correct === false).length;
+  const profitLossProxy = completeRows.reduce((sum, row) => sum + Number(row.profit_loss_proxy || 0), 0);
+  return {
+    decisions: rows.length,
+    complete: completeRows.length,
+    pending: rows.length - completeRows.length,
+    correct,
+    incorrect,
+    accuracy: completeRows.length ? round((correct / completeRows.length) * 100, 2) : null,
+    profit_loss_proxy: round(profitLossProxy, 2),
+    estimated_roi_pct: round(profitLossProxy * 2, 2),
+  };
+}
+
+function buildPerformanceDashboard(date = loadCoreState().date, learningObservability = null) {
+  const outcomeAttribution = readJsonIfExists(path.join(PROCESSED_DIR, 'outcome_attribution.json'));
+  const policyFeedback = readJsonIfExists(path.join(PROCESSED_DIR, 'policy_feedback.json'));
+  const learning = learningObservability || buildLearningObservability(date, {});
+  const outcomeRows = outcomeAttribution?.rows || [];
+  const feedbackSummary = policyFeedback?.summary || null;
+
+  const overall = feedbackSummary
+    ? {
+        decisions: feedbackSummary.decisions || 0,
+        complete: feedbackSummary.complete || 0,
+        pending: feedbackSummary.pending || 0,
+        correct: feedbackSummary.correct || 0,
+        incorrect: feedbackSummary.incorrect || 0,
+        accuracy: feedbackSummary.accuracy ?? null,
+        profit_loss_proxy: Number(feedbackSummary.profit_loss_proxy || 0),
+        estimated_roi_pct: round(Number(feedbackSummary.profit_loss_proxy || 0) * 2, 2),
+      }
+    : summarizeOutcomeRows(outcomeRows);
+
+  const primaryRow = policyFeedback?.by_action?.find((row) => row.action === 'Execute Now') || null;
+  const primaryFallback = outcomeRows.length
+    ? summarizeOutcomeRows(outcomeRows.filter((row) => row.action === 'Execute Now'))
+    : null;
+  const highRows = [
+    ...(policyFeedback?.by_conviction_tier || []).filter((row) => ['Elite Conviction', 'High Conviction'].includes(row.conviction_tier)),
+  ];
+  const highFallbackRows = outcomeRows.filter((row) => ['Elite Conviction', 'High Conviction'].includes(row.conviction_tier));
+  const highConviction = highRows.length
+    ? highRows.reduce((acc, row) => {
+        acc.decisions += row.decisions || 0;
+        acc.complete += row.complete || 0;
+        acc.pending += row.pending || 0;
+        acc.correct += row.correct || 0;
+        acc.incorrect += row.incorrect || 0;
+        acc.profit_loss_proxy += Number(row.profit_loss_proxy || 0);
+        return acc;
+      }, {
+        decisions: 0,
+        complete: 0,
+        pending: 0,
+        correct: 0,
+        incorrect: 0,
+        profit_loss_proxy: 0,
+      })
+    : highFallbackRows.length
+      ? summarizeOutcomeRows(highFallbackRows)
+      : null;
+
+  if (highConviction) {
+    highConviction.accuracy = highConviction.complete ? round((highConviction.correct / highConviction.complete) * 100, 2) : null;
+    highConviction.profit_loss_proxy = round(highConviction.profit_loss_proxy, 2);
+    highConviction.estimated_roi_pct = round(highConviction.profit_loss_proxy * 2, 2);
+  }
+
+  const primaryAllocation = primaryRow
+    ? {
+        decisions: primaryRow.decisions || 0,
+        complete: primaryRow.complete || 0,
+        pending: primaryRow.pending || 0,
+        correct: primaryRow.correct || 0,
+        incorrect: primaryRow.incorrect || 0,
+        accuracy: primaryRow.accuracy ?? null,
+        profit_loss_proxy: Number(primaryRow.profit_loss_proxy || 0),
+        estimated_roi_pct: round(Number(primaryRow.profit_loss_proxy || 0) * 2, 2),
+      }
+    : primaryFallback;
+
+  const sampleSize = overall.decisions || 0;
+  const completeOutcomes = overall.complete || 0;
+  const pendingOutcomes = overall.pending || 0;
+  const status = completeOutcomes > 0
+    ? 'tracking_results'
+    : sampleSize > 0
+      ? 'collecting_evidence'
+      : 'not_started';
+
+  return {
+    date,
+    generated_at: new Date().toISOString(),
+    unit_assumption_pct: 2,
+    status,
+    source: {
+      outcome_attribution: outcomeAttribution ? 'available' : 'missing',
+      policy_feedback: policyFeedback ? 'available' : 'missing',
+    },
+    overall,
+    primary_allocation: primaryAllocation ? {
+      label: 'Execute Now',
+      ...primaryAllocation,
+    } : null,
+    high_conviction: highConviction ? {
+      label: 'Elite + High Conviction',
+      ...highConviction,
+    } : null,
+    sample_size: sampleSize,
+    complete_outcomes: completeOutcomes,
+    pending_outcomes: pendingOutcomes,
+    realized_roi_pct: overall.estimated_roi_pct,
+    trust: {
+      ledger_coverage: learning.decision_ledger.coverage,
+      contract_validation: learning.contract_validation.status,
+      learning_status: learning.learning_status.status,
+      policy_feedback_status: learning.policy_feedback.status,
+      recommendation_count: learning.policy_feedback.recommendations,
+    },
+  };
+}
+
 function buildDecisionPanel() {
   const state = loadCoreState();
   const overview = buildOverview();
@@ -1482,6 +1611,9 @@ function buildDecisionPanel() {
       narrative: buildDecisionNarrative({ ...row, conviction_tier: convictionTier }, posture),
       timing_view: buildTimingInterpretation(row.research, bestWindow, worstWindow),
       structure_quality: buildStructureQuality(row.card, row.research),
+      component_scores: row.card.component_scores ?? null,
+      component_weights: row.card.component_weights ?? null,
+      component_explanations: row.card.component_explanations ?? null,
     };
   });
 
@@ -1526,6 +1658,8 @@ function buildDecisionPanel() {
     slateStability: portfolioGovernance.slate_stability,
     aggregateExposureIntelligence: portfolioGovernance.aggregate_exposure_intelligence,
   });
+  const learningObservability = buildLearningObservability(state.date, executiveAllocation);
+  const performanceDashboard = buildPerformanceDashboard(state.date, learningObservability);
   const ledgerRows = buildDecisionLedgerRows({
     date: state.date,
     generatedAt,
@@ -1569,7 +1703,8 @@ function buildDecisionPanel() {
     aggregate_exposure_intelligence: portfolioGovernance.aggregate_exposure_intelligence,
     executive_allocation: executiveAllocation,
     decision_ledger: decisionLedger,
-    learning_observability: buildLearningObservability(state.date, executiveAllocation),
+    learning_observability: learningObservability,
+    performance_dashboard: performanceDashboard,
     best_structures: structures,
     timing_persistence: {
       best_window: bestWindow,

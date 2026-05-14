@@ -66,6 +66,170 @@ function tierLabel(tier, t) {
   return tier ? t(`tier.${tier}`) : 'n/a';
 }
 
+const EDGE_COMPONENTS = [
+  { key: 'starter_edge', label: 'Starter' },
+  { key: 'bullpen_edge', label: 'Bullpen' },
+  { key: 'lineup_quality', label: 'Lineup' },
+  { key: 'offensive_form', label: 'Offense' },
+  { key: 'split_edge', label: 'Splits' },
+  { key: 'recent_form', label: 'Form' },
+];
+
+function cap(str) {
+  return str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
+}
+
+function buildBreakdownReading(key, score, explanation, edgePts) {
+  const magnitude = Math.abs(score);
+  const pos = score >= 0;
+  const level = magnitude >= 0.55 ? 'significant' : magnitude >= 0.25 ? 'moderate' : magnitude >= 0.08 ? 'slight' : 'minimal';
+
+  if (key === 'starter_edge') {
+    const m = explanation?.match(/starter (.+) vs (.+)/);
+    if (m) {
+      const sp1 = m[1].trim(); const sp2 = m[2].trim();
+      return pos
+        ? `${sp1} holds a ${level} edge over ${sp2} — xERA, WHIP and K/9`
+        : `${sp2} outpitches ${sp1} — ${level} disadvantage on xERA and WHIP`;
+    }
+  }
+  if (key === 'bullpen_edge') {
+    const m = explanation?.match(/ERA ([\d.]+) with (\w+)/);
+    const era = m?.[1]; const fatigue = m?.[2];
+    return pos
+      ? `Bullpen has ${level} advantage — opponent ERA higher in this matchup`
+      : `Opponent bullpen stronger${era ? ` — team ERA ${era}${fatigue ? `, ${fatigue} fatigue` : ''}` : ''}`;
+  }
+  if (key === 'lineup_quality') {
+    const m = explanation?.match(/OPS ([\d.]+) and xwOBA ([\d.]+)/);
+    const ops = m?.[1]; const xwoba = m?.[2];
+    return pos
+      ? `${cap(level)} lineup edge — OPS ${ops ?? 'n/a'}, xwOBA ${xwoba ?? 'n/a'} vs opponent`
+      : `Opponent lineup superior in OPS and xwOBA`;
+  }
+  if (key === 'split_edge') {
+    const m = explanation?.match(/vs (\w+)HP: ([\d.]+)/);
+    const hand = m?.[1]; const ops = m?.[2];
+    return pos
+      ? `${cap(level)} platoon advantage vs ${hand ?? ''}HP starter — split OPS ${ops ?? 'n/a'}`
+      : `Opponent has the platoon edge against this starter's handedness`;
+  }
+  if (key === 'offensive_form') {
+    const m = explanation?.match(/runs\/game ([\d.]+)/);
+    const rpg = m?.[1];
+    return pos
+      ? `Offense in ${level} form — ${rpg ?? 'n/a'} runs/game outpacing opponent`
+      : `Opponent offense outscoring this team recently`;
+  }
+  if (key === 'recent_form') {
+    const m = explanation?.match(/last 10 ([\d-]+) with run diff ([-\d.]+)/);
+    const rec = m?.[1]; const diff = m?.[2];
+    const diffSign = diff && Number(diff) > 0 ? '+' : '';
+    return pos
+      ? `${rec ?? 'n/a'} last 10, ${diffSign}${diff ?? 'n/a'} run diff — ${level} form edge over opponent`
+      : `Opponent in better recent form`;
+  }
+  if (key === '__market__') {
+    const pts = Math.abs(edgePts ?? 0).toFixed(1);
+    return pos
+      ? `Market undervaluing this team by ~${pts} probability points`
+      : `Model estimates this team is overpriced by ~${pts} points`;
+  }
+  return pos ? `${cap(level)} advantage in this category` : `${cap(level)} disadvantage in this category`;
+}
+
+function EdgeBreakdown({ structure }) {
+  if (!structure?.component_scores || !structure?.component_weights) return null;
+
+  const scores = structure.component_scores;
+  const weights = structure.component_weights;
+  const explanations = structure.component_explanations || {};
+  const edgePts = structure.edge_pct_points;
+
+  const contributions = EDGE_COMPONENTS.map(({ key, label }) => {
+    const contribution = (scores[key] ?? 0) * (weights[key] ?? 0) * 18;
+    return { key, label, contribution };
+  });
+
+  const maxAbs = Math.max(...contributions.map((c) => Math.abs(c.contribution)), 0.001);
+
+  return (
+    <div className="mt-4 rounded-2xl border border-emerald-300/15 bg-slate-950/40 px-4 py-3">
+      <div className="mono text-[10px] uppercase tracking-[0.22em] text-slate-500 mb-3">Edge Breakdown</div>
+
+      <div className="grid gap-[7px]">
+        {contributions.map(({ key, label, contribution }) => {
+          const pct = (Math.abs(contribution) / maxAbs) * 100;
+          const positive = contribution >= 0;
+          return (
+            <div key={label} className="flex items-center gap-3">
+              <div className="mono text-[10px] w-12 shrink-0 text-slate-400">{label}</div>
+              <div className="flex-1 h-[5px] bg-slate-800/80 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${positive ? 'bg-emerald-400/80' : 'bg-rose-400/80'}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <div className={`mono text-[10px] w-8 text-right shrink-0 tabular-nums ${positive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {positive ? '+' : ''}{contribution.toFixed(1)}
+              </div>
+            </div>
+          );
+        })}
+        {edgePts !== null && edgePts !== undefined && (
+          <div className="mt-1 pt-[7px] border-t border-slate-700/30 flex items-center gap-3">
+            <div className="mono text-[10px] w-12 shrink-0 text-slate-400">vs Mkt</div>
+            <div className="flex-1 h-[5px] bg-slate-800/80 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full bg-sky-400/80"
+                style={{ width: `${Math.min(Math.abs(edgePts) / 15 * 100, 100)}%` }}
+              />
+            </div>
+            <div className="mono text-[10px] w-8 text-right shrink-0 tabular-nums text-sky-400">
+              {edgePts > 0 ? '+' : ''}{edgePts.toFixed(1)}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 border-t border-slate-700/25 pt-3">
+        <div className="mono text-[10px] uppercase tracking-[0.22em] text-slate-600 mb-2">Reading</div>
+        <div className="grid divide-y divide-slate-700/20">
+          {contributions.map(({ key, label, contribution }) => {
+            const positive = contribution >= 0;
+            const reading = buildBreakdownReading(key, scores[key] ?? 0, explanations[key], edgePts);
+            return (
+              <div key={key} className="flex gap-3 py-[5px] items-baseline">
+                <div className={`mono text-[10px] w-20 shrink-0 tabular-nums ${positive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {label} {positive ? '+' : ''}{contribution.toFixed(2)}
+                </div>
+                <div className="text-[11px] text-slate-400 leading-snug">{reading}</div>
+              </div>
+            );
+          })}
+          {edgePts !== null && edgePts !== undefined && (
+            <div className="flex gap-3 py-[5px] items-baseline">
+              <div className="mono text-[10px] w-20 shrink-0 tabular-nums text-sky-400">
+                vs Mkt {edgePts > 0 ? '+' : ''}{edgePts.toFixed(2)}
+              </div>
+              <div className="text-[11px] text-slate-400 leading-snug">
+                {buildBreakdownReading('__market__', edgePts, null, edgePts)}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function findStructureForAllocation(structures, allocation) {
+  if (!allocation) return null;
+  return (structures || []).find((s) => (
+    s.game_id === allocation.game_id && (s.side ?? s.selection_side) === allocation.side
+  )) || null;
+}
+
 function resolvePrimaryAllocation(rows) {
   return [...(rows || [])]
     .filter((row) => row.action !== 'Pass' && exposureUnits(row.executive_exposure) > 0)
@@ -323,6 +487,7 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
   const learning = data?.learning_observability || {};
   const topRawEdge = resolveTopRawEdge(structures);
   const topRawEdgeAllocation = findAllocationForStructure(allocationRows, topRawEdge);
+  const primaryStructure = findStructureForAllocation(structures, primaryAllocation);
   const highConvictionSignals = resolveHighConvictionSignals(allocationRows);
   const timing = data?.timing_persistence || {};
   const riskLayer = data?.risk_layer || [];
@@ -367,6 +532,7 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
                 <div className="mt-4 rounded-2xl border border-emerald-300/20 bg-slate-950/35 px-4 py-3 text-sm text-slate-200">
                   {primaryAllocation?.reason || executiveMemo.recommended_deployment || t('decision.noDeploymentRecommendation')}
                 </div>
+                <EdgeBreakdown structure={primaryStructure} />
               </div>
 
               <div className="grid gap-3">
