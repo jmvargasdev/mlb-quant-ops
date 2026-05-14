@@ -161,6 +161,10 @@ function main() {
   record.steps.push(orchestrator);
   appendDailyEvent(DATE, { type: 'stage', name: 'orchestrator', active_window: activeWindow, ...orchestrator });
 
+  const notify = runScript('notify_local.js');
+  record.steps.push(notify);
+  appendDailyEvent(DATE, { type: 'stage', name: 'notify_local', active_window: activeWindow, ...notify });
+
   const research = runScript('daily_research_pipeline.js', {
     RUN_REPLAY: 'false',
   });
