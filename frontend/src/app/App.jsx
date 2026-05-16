@@ -1,6 +1,7 @@
 import { localizeWorkspace, workspaceById } from './workspaces';
 import WorkspaceHeader from '../shared/components/WorkspaceHeader';
 import WorkspaceSidebar from '../shared/components/WorkspaceSidebar';
+import LegalFooter from '../shared/components/LegalFooter';
 import SnapshotFreshness from '../shared/components/SnapshotFreshness';
 import { usePortalOverview } from '../shared/hooks/usePortalOverview';
 import { useWorkspaceState } from '../shared/hooks/useWorkspaceState';
@@ -12,6 +13,7 @@ import OpsHealthWorkspace from '../features/ops-health/OpsHealthWorkspace';
 import ResearchWorkspace from '../workspaces/research/ResearchWorkspace';
 import DecisionPanelWorkspace from '../workspaces/decision-panel/DecisionPanelWorkspace';
 import HomeWorkspace from '../workspaces/home/HomeWorkspace';
+import ResponsibleUseWorkspace from '../workspaces/responsible-use/ResponsibleUseWorkspace';
 import { fmt, timeAgo } from '../shared/lib/formatters';
 import { useLanguage } from '../shared/i18n/LanguageProvider';
 
@@ -31,6 +33,8 @@ function WorkspaceRenderer({ workspaceId, overview, detail, onSelectGame, onChan
       return <ResearchWorkspace overview={overview} status={status} active />;
     case 'ops-health':
       return <OpsHealthWorkspace overview={overview} status={status} />;
+    case 'responsible-use':
+      return <ResponsibleUseWorkspace />;
     default:
       return <DecisionPanelWorkspace overview={overview} status={status} active />;
   }
@@ -130,6 +134,7 @@ export default function App() {
           />
         </main>
       </div>
+      <LegalFooter />
     </div>
   );
 }

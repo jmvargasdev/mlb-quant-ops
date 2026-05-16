@@ -10,6 +10,10 @@ auth.json
 *.key
 *.p12
 *.pfx
+.cloudflared/
+cloudflared/
+cert.pem
+*cloudflared*.json
 
 # Build outputs
 dist/
@@ -77,6 +81,7 @@ Desktop.ini
 design-md-repo/
 
 # Local exploratory assets and ad hoc exports
+docs/monetization-strategy.md
 daily_mlb_report.md
 mlb_matchups_today.csv
 mlb_matchups_today.json

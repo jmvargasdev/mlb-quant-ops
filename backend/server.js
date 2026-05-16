@@ -12,12 +12,31 @@ const app = express();
 const PORT = config.app.port;
 const DIST_DIR = path.join(ROOT, 'frontend', 'dist');
 const BOOTSTRAP_SCRIPT = path.join(ROOT, 'mlb_ops', 'scripts', 'daily_system_bootstrap.js');
+function isAllowedOrigin(origin) {
+  if (!origin) return false;
+  try {
+    const { protocol, hostname } = new URL(origin);
+    if (protocol !== 'https:') return false;
+    return (
+      hostname === 'marketsentinel.net' ||
+      hostname === 'www.marketsentinel.net' ||
+      hostname.endsWith('.lovable.app') ||
+      hostname.endsWith('.lovableproject.com')
+    );
+  } catch {
+    return false;
+  }
+}
 let bootstrapScheduler = null;
 
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  const origin = req.get('Origin');
+  if (isAllowedOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
   if (req.path.startsWith('/api/')) {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');

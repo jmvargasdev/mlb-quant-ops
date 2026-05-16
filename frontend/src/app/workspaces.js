@@ -48,6 +48,13 @@ export const WORKSPACE_DEFINITIONS = [
     questionKey: 'workspace.health.question',
     descriptionKey: 'workspace.health.description',
   },
+  {
+    id: 'responsible-use',
+    labelKey: 'workspace.responsible.label',
+    shortLabelKey: 'workspace.responsible.short',
+    questionKey: 'workspace.responsible.question',
+    descriptionKey: 'workspace.responsible.description',
+  },
 ];
 
 export const WORKSPACES = WORKSPACE_DEFINITIONS.map((workspace) => ({
