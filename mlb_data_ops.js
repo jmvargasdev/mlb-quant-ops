@@ -766,7 +766,14 @@ async function scrapeCoversOdds(browser) {
 }
 
 function parseRotowireOdds(items) {
-  const result = { moneyline: null, total: null, raw: items };
+  const result = {
+    moneyline: null,
+    total: null,
+    total_over_price: null,
+    total_under_price: null,
+    run_line: null,
+    raw: items,
+  };
   for (const item of items || []) {
     if (item.startsWith('LINE')) {
       const moneylineMatch = item.match(/([A-Z]{2,4}\s*[+-]\d+)/);
@@ -775,9 +782,44 @@ function parseRotowireOdds(items) {
     if (item.startsWith('O/U')) {
       const totalMatch = item.match(/(\d+(?:\.\d+)?)\s*Runs/i);
       result.total = totalMatch ? `${totalMatch[1]} Runs` : item.replace(/^O\/U\s*/i, '').trim();
+      const overMatch = item.match(/\bO(?:ver)?\s*([+-]\d+)/i);
+      const underMatch = item.match(/\bU(?:nder)?\s*([+-]\d+)/i);
+      result.total_over_price = overMatch ? Number(overMatch[1]) : null;
+      result.total_under_price = underMatch ? Number(underMatch[1]) : null;
+    }
+    if (/^(RUN\s*LINE|RL|SPREAD)/i.test(item)) {
+      result.run_line = item.replace(/^(RUN\s*LINE|RL|SPREAD)\s*/i, '').trim();
     }
   }
   return result;
+}
+
+function parseRotowireRunLine(line, awayAbbr, homeAbbr) {
+  if (!line) return null;
+  const normalizedAway = normalizeTeamAbbr(awayAbbr);
+  const normalizedHome = normalizeTeamAbbr(homeAbbr);
+  const pattern = /([A-Z]{2,4})\s*([+-]\d+(?:\.\d+)?)\s*([+-]\d+)/g;
+  const out = {
+    away_points: null,
+    away_price: null,
+    home_points: null,
+    home_price: null,
+    raw: line,
+  };
+  for (const match of line.matchAll(pattern)) {
+    const abbr = normalizeTeamAbbr(match[1]);
+    const points = Number(match[2]);
+    const price = Number(match[3]);
+    if (abbr === normalizedAway) {
+      out.away_points = points;
+      out.away_price = price;
+    }
+    if (abbr === normalizedHome) {
+      out.home_points = points;
+      out.home_price = price;
+    }
+  }
+  return out.away_points !== null || out.home_points !== null ? out : null;
 }
 
 function buildFormSummary(teamId, teamStats, recentGames) {
@@ -964,6 +1006,9 @@ function resolveCoversOdds(coversGames, awayAbbr, homeAbbr) {
 
 function buildMarketData(rotowireGame, coversGame) {
   const rotowireOdds = parseRotowireOdds(rotowireGame?.odds_items);
+  const awayAbbr = normalizeTeamAbbr(rotowireGame?.away_abbr || coversGame?.away_abbr || '');
+  const homeAbbr = normalizeTeamAbbr(rotowireGame?.home_abbr || coversGame?.home_abbr || '');
+  const runLine = parseRotowireRunLine(rotowireOdds.run_line, awayAbbr, homeAbbr);
   const currentAwayDecimal = coversGame?.current_decimal_away || null;
   const currentHomeDecimal = coversGame?.current_decimal_home || null;
 
@@ -990,10 +1035,13 @@ function buildMarketData(rotowireGame, coversGame) {
       },
       rotowire_line: rotowireOdds.moneyline,
     },
-    runline: null,
+    run_line: runLine,
+    runline: runLine,
     total: {
       current: parseTotalRuns(rotowireOdds.total),
       display: rotowireOdds.total,
+      over_price: rotowireOdds.total_over_price,
+      under_price: rotowireOdds.total_under_price,
     },
     live_odds: null,
   };

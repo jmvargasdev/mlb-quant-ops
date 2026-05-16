@@ -79,7 +79,14 @@ function americanToImplied(american) {
 }
 
 function parseRotowireOdds(items) {
-  const result = { moneyline: null, total: null, raw: items || [] };
+  const result = {
+    moneyline: null,
+    total: null,
+    total_over_price: null,
+    total_under_price: null,
+    run_line: null,
+    raw: items || [],
+  };
   for (const item of items || []) {
     if (item.startsWith('LINE')) {
       const match = item.match(/([A-Z]{2,4}\s*[+-]\d+)/);
@@ -88,9 +95,44 @@ function parseRotowireOdds(items) {
     if (item.startsWith('O/U')) {
       const totalMatch = item.match(/(\d+(?:\.\d+)?)\s*Runs/i);
       result.total = totalMatch ? Number(totalMatch[1]) : null;
+      const overMatch = item.match(/\bO(?:ver)?\s*([+-]\d+)/i);
+      const underMatch = item.match(/\bU(?:nder)?\s*([+-]\d+)/i);
+      result.total_over_price = overMatch ? Number(overMatch[1]) : null;
+      result.total_under_price = underMatch ? Number(underMatch[1]) : null;
+    }
+    if (/^(RUN\s*LINE|RL|SPREAD)/i.test(item)) {
+      result.run_line = item.replace(/^(RUN\s*LINE|RL|SPREAD)\s*/i, '').trim();
     }
   }
   return result;
+}
+
+function parseRotowireRunLine(line, awayAbbr, homeAbbr) {
+  if (!line) return null;
+  const normalizedAway = normalizeTeamAbbr(awayAbbr);
+  const normalizedHome = normalizeTeamAbbr(homeAbbr);
+  const pattern = /([A-Z]{2,4})\s*([+-]\d+(?:\.\d+)?)\s*([+-]\d+)/g;
+  const out = {
+    away_points: null,
+    away_price: null,
+    home_points: null,
+    home_price: null,
+    raw: line,
+  };
+  for (const match of line.matchAll(pattern)) {
+    const abbr = normalizeTeamAbbr(match[1]);
+    const points = Number(match[2]);
+    const price = Number(match[3]);
+    if (abbr === normalizedAway) {
+      out.away_points = points;
+      out.away_price = price;
+    }
+    if (abbr === normalizedHome) {
+      out.home_points = points;
+      out.home_price = price;
+    }
+  }
+  return out.away_points !== null || out.home_points !== null ? out : null;
 }
 
 function parseRotowireMoneyline(line, awayAbbr, homeAbbr) {
@@ -525,6 +567,9 @@ async function main() {
     const rwOdds = parseRotowireOdds(rotowire?.odds_items);
     const rwLine = parseRotowireMoneyline(game.market?.moneyline?.rotowire_line || null, awayAbbr, homeAbbr) || parseRotowireMoneyline(rwOdds.moneyline, awayAbbr, homeAbbr);
     const currentTotal = rwOdds.total ?? game.market?.total?.current ?? null;
+    const currentTotalOverPrice = rwOdds.total_over_price ?? game.market?.total?.over_price ?? null;
+    const currentTotalUnderPrice = rwOdds.total_under_price ?? game.market?.total?.under_price ?? null;
+    const currentRunLine = parseRotowireRunLine(rwOdds.run_line, awayAbbr, homeAbbr) || game.market?.run_line || null;
 
     const disagreementScore = (() => {
       const rwFavorite = parseFavoriteFromMoneyline(game.market?.moneyline?.rotowire_line || rwOdds.moneyline || null);
@@ -653,7 +698,16 @@ async function main() {
         home: homeCurrent,
         total: {
           current: currentTotal,
+          over_price: currentTotalOverPrice,
+          under_price: currentTotalUnderPrice,
           previous: previous?.market?.total?.current ?? game.market?.total?.current ?? null,
+        },
+        run_line: {
+          away_points: currentRunLine?.away_points ?? null,
+          away_price: currentRunLine?.away_price ?? null,
+          home_points: currentRunLine?.home_points ?? null,
+          home_price: currentRunLine?.home_price ?? null,
+          raw: currentRunLine?.raw ?? null,
         },
         opening: {
           away_american: coversOpenAwayAmerican,
@@ -719,6 +773,10 @@ async function main() {
         directional_consensus: metrics.directional_consensus,
         market_pressure: metrics.market_pressure,
         total_current: currentTotal,
+        total_over_price: currentTotalOverPrice,
+        total_under_price: currentTotalUnderPrice,
+        run_line_points: side === 'away' ? currentRunLine?.away_points ?? null : currentRunLine?.home_points ?? null,
+        run_line_price: side === 'away' ? currentRunLine?.away_price ?? null : currentRunLine?.home_price ?? null,
         fair_win_probability: metrics.fair_win_probability,
         market_implied_probability: marketCurrent.current_implied_probability,
         edge_vs_market_pct_points: metrics.edge_vs_market !== null ? round(metrics.edge_vs_market * 100, 2) : null,

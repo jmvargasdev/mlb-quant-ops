@@ -27,7 +27,7 @@ export default function EdgeCard({ card, selected, onSelect }) {
         </div>
         <div className="mono text-right text-xs text-slate-400">
           <div>{card.game_time_local || 'TBD'}</div>
-          <div className="mt-1">{card.lean}</div>
+          <div className="mt-1">{card.display_lean || card.lean}</div>
         </div>
       </div>
 

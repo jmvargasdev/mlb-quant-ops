@@ -33,6 +33,8 @@ const SCHEMA = {
   AUTO_DAILY_BOOTSTRAP: { type: 'boolean', default: true },
   AUTO_BOOTSTRAP_INTERVAL_MINUTES: { type: 'number', default: 15, min: 1 },
   AUTO_BOOTSTRAP_FORCE: { type: 'boolean', default: true },
+  AUTO_INTRADAY_SCHEDULER: { type: 'boolean', default: false },
+  AUTO_INTRADAY_RUN_ON_STARTUP: { type: 'boolean', default: false },
   VITE_DEV_PORT: { type: 'number', default: 5173, min: 1 },
 };
 
@@ -155,6 +157,8 @@ function validateAndBuildConfig() {
       autoDailyBootstrap: values.AUTO_DAILY_BOOTSTRAP,
       autoBootstrapIntervalMinutes: values.AUTO_BOOTSTRAP_INTERVAL_MINUTES,
       autoBootstrapForce: values.AUTO_BOOTSTRAP_FORCE,
+      autoIntradayScheduler: values.AUTO_INTRADAY_SCHEDULER,
+      autoIntradayRunOnStartup: values.AUTO_INTRADAY_RUN_ON_STARTUP,
     },
     frontend: {
       apiUrl: values.VITE_API_URL,

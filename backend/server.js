@@ -4,6 +4,7 @@ const path = require('path');
 const portalRoutes = require('../api/portal-routes');
 const { getRuntimeConfig, validateRuntimeConfig } = require('../config');
 const { startBootstrapScheduler } = require('./bootstrap-scheduler');
+const { startIntradayScheduler } = require('./intraday-scheduler');
 
 validateRuntimeConfig();
 const config = getRuntimeConfig();
@@ -12,6 +13,7 @@ const app = express();
 const PORT = config.app.port;
 const DIST_DIR = path.join(ROOT, 'frontend', 'dist');
 const BOOTSTRAP_SCRIPT = path.join(ROOT, 'mlb_ops', 'scripts', 'daily_system_bootstrap.js');
+const INTRADAY_SCRIPT = path.join(ROOT, 'mlb_ops', 'scripts', 'daily_operations_orchestrator.js');
 function isAllowedOrigin(origin) {
   if (!origin) return false;
   try {
@@ -28,6 +30,7 @@ function isAllowedOrigin(origin) {
   }
 }
 let bootstrapScheduler = null;
+let intradayScheduler = null;
 
 app.use((req, res, next) => {
   const origin = req.get('Origin');
@@ -60,6 +63,7 @@ app.get('/health', (req, res) => {
     environment: config.app.appEnv,
     timestamp: new Date().toISOString(),
     bootstrap_scheduler: bootstrapScheduler?.status?.() || null,
+    intraday_scheduler: intradayScheduler?.status?.() || null,
   });
 });
 
@@ -84,3 +88,12 @@ app.listen(PORT, () => {
     force: config.app.autoBootstrapForce,
   });
 });
+
+if (config.app.autoIntradayScheduler) {
+  intradayScheduler = startIntradayScheduler({
+    root: ROOT,
+    scriptPath: INTRADAY_SCRIPT,
+    artifactsPath: config.storage.artifactsPath,
+    runOnStartup: config.app.autoIntradayRunOnStartup,
+  });
+}

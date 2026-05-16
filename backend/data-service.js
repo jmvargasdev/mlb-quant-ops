@@ -123,6 +123,85 @@ function classifyHealthStatus(value) {
   return 'stale';
 }
 
+function resolveRunLine(awayLine, homeLine) {
+  if (awayLine === null || awayLine === undefined || homeLine === null || homeLine === undefined) {
+    return { away: null, home: null, source: 'unavailable' };
+  }
+  const awayFavorite = Number(awayLine) < Number(homeLine);
+  return {
+    away: awayFavorite ? '-1.5' : '+1.5',
+    home: awayFavorite ? '+1.5' : '-1.5',
+    source: 'derived_spread_only',
+  };
+}
+
+function buildMarketTicker(state) {
+  return (state.timeline?.games || []).map((game) => {
+    const latest = game.snapshots?.[game.snapshots.length - 1] || null;
+    const awayLine = latest?.away?.current_american ?? null;
+    const homeLine = latest?.home?.current_american ?? null;
+    const runLine = resolveRunLine(awayLine, homeLine);
+    return {
+      game_id: game.game_id,
+      matchup: `${game.matchup.away.team} @ ${game.matchup.home.team}`,
+      game_time_local: game.matchup.game_time_local || null,
+      away: {
+        team: game.matchup.away.team,
+        abbreviation: game.matchup.away.abbreviation,
+        moneyline: awayLine,
+        run_line: latest?.away?.run_line_points ?? runLine.away,
+        run_line_price: latest?.away?.run_line_price ?? null,
+      },
+      home: {
+        team: game.matchup.home.team,
+        abbreviation: game.matchup.home.abbreviation,
+        moneyline: homeLine,
+        run_line: latest?.home?.run_line_points ?? runLine.home,
+        run_line_price: latest?.home?.run_line_price ?? null,
+      },
+      total: latest?.total_current ?? null,
+      total_over_price: latest?.total_over_price ?? null,
+      total_under_price: latest?.total_under_price ?? null,
+      snapshot_label: latest?.auto_label || latest?.source_label || null,
+      snapshot_time: latest?.timestamp || null,
+      source_confidence: latest?.source_confidence ?? null,
+      run_line_source: runLine.source,
+    };
+  }).filter((row) => row.away.moneyline !== null || row.home.moneyline !== null || row.total !== null);
+}
+
+function buildMultiMarketSummary(state) {
+  const candidates = (state.scored?.games || [])
+    .flatMap((game) => game.scoring?.market_candidates || []);
+  const eligible = candidates.filter((row) => row.eligible);
+  const byMarket = (marketType) => eligible
+    .filter((row) => row.market_type === marketType)
+    .sort((a, b) => Math.abs(b.edge || 0) - Math.abs(a.edge || 0));
+
+  return {
+    generated_at: state.scored?.meta?.generated_at || null,
+    markets: {
+      moneyline: {
+        eligible_count: byMarket('moneyline').length,
+        top: byMarket('moneyline').slice(0, 6),
+      },
+      totals: {
+        eligible_count: byMarket('total').length,
+        top: byMarket('total').slice(0, 6),
+      },
+      run_line: {
+        eligible_count: byMarket('run_line').length,
+        top: byMarket('run_line').slice(0, 6),
+      },
+    },
+    unavailable_counts: candidates.reduce((acc, row) => {
+      if (row.eligible) return acc;
+      acc[row.market_type] = (acc[row.market_type] || 0) + 1;
+      return acc;
+    }, {}),
+  };
+}
+
 function refreshPolicy(snapshotLabel) {
   if (['close'].includes(snapshotLabel)) {
     return { interval_ms: 15000, profile: 'close', rationale: 'Immediate close monitoring.' };
@@ -274,6 +353,15 @@ function buildGameCard(scoredGame, maps) {
       : bestEdge.preliminary_lean === 'No action edge'
         ? 'no_action'
         : 'other';
+  const displayLean = category === 'top_bettable'
+    ? 'Priority signal'
+    : category === 'watchlist'
+      ? 'Watchlist signal'
+      : category === 'no_action'
+        ? 'Observation signal'
+        : bestEdge.preliminary_lean === 'Fade / avoid price'
+          ? 'Negative value signal'
+          : bestEdge.preliminary_lean;
 
   return {
     game_id: scoredGame.game_id,
@@ -285,6 +373,7 @@ function buildGameCard(scoredGame, maps) {
     opponent: bestEdge.team === scoredGame.matchup.home.team ? scoredGame.matchup.away.team : scoredGame.matchup.home.team,
     category,
     lean: bestEdge.preliminary_lean,
+    display_lean: displayLean,
     fair_probability: bestEdge.fair_win_probability,
     market_probability: bestEdge.market_implied_probability,
     edge_pct_points: bestEdge.edge_vs_market_pct_points,
@@ -329,6 +418,7 @@ function buildFadeCards(scoredGames) {
         volatility_score: score.volatility_score,
         flags: score.flags || [],
         lean: score.preliminary_lean,
+        display_lean: 'Negative value signal',
       });
     }
   }
@@ -2317,6 +2407,8 @@ function buildOverview() {
       average_timing_quality: average((state.clvPreparation?.records || []).map((row) => row.timing_quality_score)),
       validation_buckets: state.clvResearch?.summary?.validation_bucket_counts || {},
     },
+    market_ticker: buildMarketTicker(state),
+    multi_market_summary: buildMultiMarketSummary(state),
     research: {
       persistence: state.persistenceResearch?.summary || null,
       timing: state.timingResearch?.summary || null,
@@ -2355,6 +2447,10 @@ function gameDetail(gameId) {
     timestamp: snapshot.timestamp,
     away_team: timeline.matchup.away.team,
     home_team: timeline.matchup.home.team,
+    away_abbreviation: timeline.matchup.away.abbreviation,
+    home_abbreviation: timeline.matchup.home.abbreviation,
+    away_american: snapshot.away.current_american,
+    home_american: snapshot.home.current_american,
     away_implied: signedPct(snapshot.away.current_implied_probability),
     home_implied: signedPct(snapshot.home.current_implied_probability),
     away_edge: signedPct(snapshot.away.edge_vs_market),
@@ -2363,6 +2459,14 @@ function gameDetail(gameId) {
     home_volatility: snapshot.home.volatility_score,
     disagreement: round(snapshot.market_disagreement_score, 4),
     market_pressure: round((snapshot.away.market_pressure || 0) + (snapshot.home.market_pressure || 0), 3),
+    total_current: snapshot.total_current,
+    total_over_price: snapshot.total_over_price,
+    total_under_price: snapshot.total_under_price,
+    away_run_line: snapshot.run_line?.away_points ?? snapshot.away.run_line_points ?? null,
+    away_run_line_price: snapshot.run_line?.away_price ?? snapshot.away.run_line_price ?? null,
+    home_run_line: snapshot.run_line?.home_points ?? snapshot.home.run_line_points ?? null,
+    home_run_line_price: snapshot.run_line?.home_price ?? snapshot.home.run_line_price ?? null,
+    run_line_raw: snapshot.run_line?.raw || null,
   }));
 
   return {

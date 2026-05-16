@@ -67,6 +67,18 @@ function tierLabel(tier, t) {
   return tier ? t(`tier.${tier}`) : 'n/a';
 }
 
+function neutralizeDecisionText(value, t) {
+  if (!value) return value;
+  return String(value)
+    .replaceAll('Execute Now', t('action.Execute Now'))
+    .replaceAll('Wait for Confirmation', t('action.Wait for Confirmation'))
+    .replaceAll('Pass', t('action.Pass'))
+    .replaceAll('full deployment', 'full signal quality')
+    .replaceAll('capital deployment', 'signal priority')
+    .replaceAll('deployment recommendation', 'priority signal')
+    .replaceAll('deployable capital', 'usable exposure context');
+}
+
 const EDGE_COMPONENTS = [
   { key: 'starter_edge', label: 'Starter' },
   { key: 'bullpen_edge', label: 'Bullpen' },
@@ -518,7 +530,7 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
             <div className="rounded-2xl border border-emerald-400/40 bg-emerald-400/10 px-5 py-4 animate-pulse">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="mono text-[11px] uppercase tracking-[0.3em] text-emerald-300">Execute Now</div>
+                  <div className="mono text-[11px] uppercase tracking-[0.3em] text-emerald-300">{t('action.Execute Now')}</div>
                   <div className="mt-1 flex flex-wrap gap-3">
                     {alertBanner.map((s) => (
                       <span key={`${s.game_id}:${s.side}`} className="text-sm font-semibold text-white">
@@ -568,7 +580,7 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
                   </div>
                 </div>
                 <div className="mt-4 rounded-2xl border border-emerald-300/20 bg-slate-950/35 px-4 py-3 text-sm text-slate-200">
-                  {primaryAllocation?.reason || executiveMemo.recommended_deployment || t('decision.noDeploymentRecommendation')}
+                  {neutralizeDecisionText(primaryAllocation?.reason || executiveMemo.recommended_deployment, t) || t('decision.noDeploymentRecommendation')}
                 </div>
                 <EdgeBreakdown structure={primaryStructure} />
               </div>
@@ -602,7 +614,7 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
                 <DetailCard
                   label={t('decision.governedExposure')}
                   value={portfolioSummary.total_suggested_exposure || deployment.total_allocated_exposure}
-                  helper={`raw ${portfolioSummary.raw_total_exposure || 'n/a'} / allocated ${deployment.total_allocated_exposure || 'n/a'}`}
+                  helper={`raw ${portfolioSummary.raw_total_exposure || 'n/a'} / signal ${deployment.total_allocated_exposure || 'n/a'}`}
                   tone={riskTone(portfolioSummary.recommended_aggression)}
                 />
                 <DetailCard

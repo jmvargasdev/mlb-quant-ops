@@ -2,6 +2,7 @@ import { localizeWorkspace, workspaceById } from './workspaces';
 import WorkspaceHeader from '../shared/components/WorkspaceHeader';
 import WorkspaceSidebar from '../shared/components/WorkspaceSidebar';
 import LegalFooter from '../shared/components/LegalFooter';
+import MarketTickerTape from '../shared/components/MarketTickerTape';
 import SnapshotFreshness from '../shared/components/SnapshotFreshness';
 import { usePortalOverview } from '../shared/hooks/usePortalOverview';
 import { useWorkspaceState } from '../shared/hooks/useWorkspaceState';
@@ -57,6 +58,7 @@ export default function App() {
     volatility_leaders: [],
     persistence_leaders: [],
     clv_preparation: {},
+    market_ticker: [],
     game_index: [],
   };
   const initialGameId = safeOverview.sections.top_bettable?.[0]?.game_id || safeOverview.game_index?.[0]?.game_id || null;
@@ -74,8 +76,8 @@ export default function App() {
   const snapshotDensity = safeOverview.operational_health?.snapshot_density_score;
   const refreshProfile = safeOverview.meta?.refresh_policy?.profile || 'n/a';
   const scheduleTiming = safeOverview.meta?.schedule_timing || {};
-  const processUpdatedAt = scheduleTiming.process_updated_at || safeOverview.meta?.generated_at || status.lastUpdated;
   const latestSnapshotAt = scheduleTiming.last_snapshot_captured_at || safeOverview.meta?.latest_snapshot_time || status.latestSnapshotAt || null;
+  const processUpdatedAt = latestSnapshotAt || safeOverview.meta?.generated_at || scheduleTiming.process_updated_at || status.lastUpdated;
   const nextScheduledSnapshot = scheduleTiming.next_scheduled_snapshot || 'n/a';
 
   if (status.loading && !overview) {
@@ -124,6 +126,7 @@ export default function App() {
 
         <main className="grid gap-5">
           <WorkspaceHeader workspace={resolvedWorkspace} overview={safeOverview} status={status} detail={detail} />
+          <MarketTickerTape rows={safeOverview.market_ticker || []} />
           <WorkspaceRenderer
             workspaceId={workspaceId}
             overview={safeOverview}

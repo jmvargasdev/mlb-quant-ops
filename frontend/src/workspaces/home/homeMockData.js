@@ -71,7 +71,7 @@ export const HOME_MOCK_DASHBOARD = {
     },
   ],
   primary_allocation: {
-    label: 'Execute Now',
+    label: 'High Signal',
     decisions: 9,
     complete: 8,
     pending: 1,

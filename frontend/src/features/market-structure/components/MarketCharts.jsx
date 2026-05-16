@@ -34,6 +34,29 @@ function buildTimelineRows(snapshots) {
   });
 }
 
+function formatAmerican(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return 'n/a';
+  const numeric = Number(value);
+  return numeric > 0 ? `+${numeric}` : String(numeric);
+}
+
+function formatTotal(row) {
+  if (row.total_current === null || row.total_current === undefined || Number.isNaN(Number(row.total_current))) return 'n/a';
+  const total = Number(row.total_current).toFixed(Number.isInteger(Number(row.total_current)) ? 0 : 1);
+  const over = formatAmerican(row.total_over_price);
+  const under = formatAmerican(row.total_under_price);
+  if (over === 'n/a' && under === 'n/a') return total;
+  return `${total} O${over}/U${under}`;
+}
+
+function formatSpread(points, price) {
+  if (points === null || points === undefined || Number.isNaN(Number(points))) return 'n/a';
+  const numeric = Number(points);
+  const spread = `${numeric > 0 ? '+' : ''}${numeric.toFixed(1)}`;
+  const linePrice = formatAmerican(price);
+  return linePrice === 'n/a' ? spread : `${spread} ${linePrice}`;
+}
+
 export default function MarketCharts({ detail }) {
   const rows = buildTimelineRows(detail?.charts?.snapshots);
   const showDots = rows.length <= 4;
@@ -105,25 +128,33 @@ export default function MarketCharts({ detail }) {
       </div>
 
       {!!rows.length && (
-        <div className="mt-4 rounded-2xl border border-slate-700/35">
-          <div className="grid grid-cols-[88px_minmax(0,1fr)_92px_92px] gap-3 border-b border-slate-700/35 px-4 py-2 mono text-[11px] uppercase tracking-[0.22em] text-slate-500">
-            <div>Update</div>
-            <div>Snapshot</div>
-            <div>Away Edge</div>
-            <div>Home Edge</div>
-          </div>
-          <div className="divide-y divide-slate-700/25">
-            {rows.slice(-5).map((row) => (
-              <div key={`${row.timestamp}-${row.update_number}`} className="grid grid-cols-[88px_minmax(0,1fr)_92px_92px] gap-3 px-4 py-3 text-sm">
-                <div className="mono text-slate-400">#{row.update_number}</div>
-                <div className="min-w-0">
-                  <div className="truncate text-white">{row.source_label || row.label || 'snapshot'}</div>
-                  <div className="mt-0.5 text-xs text-slate-500">{timestampLabel(row.timestamp)}</div>
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-700/35">
+          <div className="min-w-[760px]">
+            <div className="grid grid-cols-[72px_minmax(0,1fr)_88px_96px_96px_88px_88px] gap-3 border-b border-slate-700/35 px-4 py-2 mono text-[11px] uppercase tracking-[0.22em] text-slate-500">
+              <div>Update</div>
+              <div>Snapshot</div>
+              <div>Total</div>
+              <div>Away RL</div>
+              <div>Home RL</div>
+              <div>Away Edge</div>
+              <div>Home Edge</div>
+            </div>
+            <div className="divide-y divide-slate-700/25">
+              {rows.slice(-5).map((row) => (
+                <div key={`${row.timestamp}-${row.update_number}`} className="grid grid-cols-[72px_minmax(0,1fr)_88px_96px_96px_88px_88px] gap-3 px-4 py-3 text-sm">
+                  <div className="mono text-slate-400">#{row.update_number}</div>
+                  <div className="min-w-0">
+                    <div className="truncate text-white">{row.source_label || row.label || 'snapshot'}</div>
+                    <div className="mt-0.5 text-xs text-slate-500">{timestampLabel(row.timestamp)}</div>
+                  </div>
+                  <div className="text-slate-200">{formatTotal(row)}</div>
+                  <div className="text-slate-200">{formatSpread(row.away_run_line, row.away_run_line_price)}</div>
+                  <div className="text-slate-200">{formatSpread(row.home_run_line, row.home_run_line_price)}</div>
+                  <div className="text-slate-200">{signedPoints(row.away_edge)}</div>
+                  <div className="text-slate-200">{signedPoints(row.home_edge)}</div>
                 </div>
-                <div className="text-slate-200">{signedPoints(row.away_edge)}</div>
-                <div className="text-slate-200">{signedPoints(row.home_edge)}</div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
           <div className="border-t border-slate-700/35 px-4 py-2 text-xs text-slate-500">
             {rows.length} update{rows.length === 1 ? '' : 's'} captured. Latest pressure: {fmt(rows[rows.length - 1].market_pressure, 3)}.

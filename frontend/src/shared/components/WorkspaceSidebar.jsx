@@ -10,8 +10,8 @@ export default function WorkspaceSidebar({ activeWorkspace, onChange, overview, 
   const isHomeWorkspace = activeWorkspace === 'home';
   const workspaces = WORKSPACE_DEFINITIONS.map((workspace) => localizeWorkspace(workspace, t));
   const scheduleTiming = overview?.meta?.schedule_timing || {};
-  const processUpdatedAt = scheduleTiming.process_updated_at || overview?.meta?.generated_at || null;
   const latestSnapshotAt = scheduleTiming.last_snapshot_captured_at || overview?.meta?.latest_snapshot_time || null;
+  const processUpdatedAt = latestSnapshotAt || overview?.meta?.generated_at || scheduleTiming.process_updated_at || null;
 
   return (
     <aside className="panel panel-strong rounded-3xl p-4 lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:overflow-hidden">

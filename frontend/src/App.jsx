@@ -22,8 +22,8 @@ function SelectionConsole({ overview, selectedGameId, onSelect }) {
   return (
     <div className="grid gap-6">
       <EdgeSection
-        title="Top Bettable Edges"
-        subtitle="Highest-ranked live selections from the scoring and persistence layers."
+        title="Priority Signals"
+        subtitle="Highest-ranked live model signals from the scoring and persistence layers."
         cards={top}
         selectedGameId={selectedGameId}
         onSelect={onSelect}
@@ -37,15 +37,15 @@ function SelectionConsole({ overview, selectedGameId, onSelect }) {
           onSelect={onSelect}
         />
         <EdgeSection
-          title="No Action"
-          subtitle="Informative rows that do not clear action thresholds."
+          title="Observation Only"
+          subtitle="Informative rows that do not clear signal-priority thresholds."
           cards={noAction}
           selectedGameId={selectedGameId}
           onSelect={onSelect}
         />
       </div>
       <EdgeSection
-        title="Fades"
+        title="Negative Value Signals"
         subtitle="Overpriced or structurally weak market sides."
         cards={fades}
         selectedGameId={selectedGameId}

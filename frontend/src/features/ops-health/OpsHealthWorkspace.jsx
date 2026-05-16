@@ -11,8 +11,8 @@ export default function OpsHealthWorkspace({ overview, status }) {
   const bootstrapStatus = overview?.meta?.bootstrap_status || null;
   const operationalChecklist = overview?.meta?.operational_checklist || null;
   const research = overview?.research || {};
-  const processUpdatedAt = scheduleTiming.process_updated_at || overview?.meta?.generated_at || status?.lastUpdated || null;
   const latestSnapshotAt = scheduleTiming.last_snapshot_captured_at || overview?.meta?.latest_snapshot_time || status?.latestSnapshotAt || null;
+  const processUpdatedAt = latestSnapshotAt || overview?.meta?.generated_at || scheduleTiming.process_updated_at || status?.lastUpdated || null;
   const scheduledPayloads = overview?.meta?.scheduled_payloads || [];
   const timelineProgress = health.timeline_progress || { total: 0, completed: 0, current: 0, pending: 0, completion_pct: 0 };
   const metrics = [
@@ -32,7 +32,7 @@ export default function OpsHealthWorkspace({ overview, status }) {
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               <div className="rounded-2xl border border-slate-700/35 bg-slate-950/55 p-4 md:col-span-2 xl:col-span-2">
                 <div className="mono text-[11px] uppercase tracking-[0.25em] text-slate-500">Operational Pulse</div>
-                <div className="mt-2 text-lg font-semibold text-white">Last process update: {timestampFull(processUpdatedAt)}</div>
+                <div className="mt-2 text-lg font-semibold text-white">Latest data update: {timestampFull(processUpdatedAt)}</div>
                 <div className="mt-1 text-xs text-slate-400">{timeAgo(processUpdatedAt)}</div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <div className="rounded-xl border border-slate-700/30 bg-slate-900/40 p-3">

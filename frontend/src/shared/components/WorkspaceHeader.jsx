@@ -29,8 +29,8 @@ export default function WorkspaceHeader({ workspace, overview, status, detail })
   const isAllocationWorkspace = workspace?.id === 'decision-panel';
   const isHomeWorkspace = workspace?.id === 'home';
   const scheduleTiming = overview?.meta?.schedule_timing || {};
-  const processUpdatedAt = scheduleTiming.process_updated_at || overview?.meta?.generated_at || status?.lastUpdated || null;
   const latestSnapshotAt = scheduleTiming.last_snapshot_captured_at || overview?.meta?.latest_snapshot_time || status?.latestSnapshotAt || null;
+  const processUpdatedAt = latestSnapshotAt || overview?.meta?.generated_at || scheduleTiming.process_updated_at || status?.lastUpdated || null;
   const currentDateLabel = new Date().toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'short',

@@ -452,6 +452,160 @@ function buildLean(sideAnalysis) {
   return 'No action edge';
 }
 
+function signalLabel(score, confidence) {
+  if (score >= 12 && confidence >= 62) return 'Priority signal';
+  if (score >= 6 && confidence >= 55) return 'Watchlist signal';
+  if (score <= -8) return 'Negative value signal';
+  return 'Observation signal';
+}
+
+function marketStatus(hasRequiredData, edgeValue, highThreshold, watchThreshold) {
+  if (!hasRequiredData) return 'insufficient_market_data';
+  const absEdge = Math.abs(edgeValue || 0);
+  if (absEdge >= highThreshold) return 'priority_signal';
+  if (absEdge >= watchThreshold) return 'watchlist_signal';
+  return 'observation_only';
+}
+
+function estimateModelTotal(game, home, away) {
+  const park = game.advanced_sabermetrics?.park_factor?.overall ?? 100;
+  const temp = game.weather?.combined?.temperature_f ?? 72;
+  const wind = game.weather?.combined?.wind_speed_mph ?? 0;
+  const rain = game.weather?.combined?.rain_probability_pct ?? 0;
+  const offenseBase = average([
+    home.form.runs_per_game,
+    away.form.runs_per_game,
+  ], 4);
+  const lineupOps = average([
+    home.lineup.avg_ops,
+    away.lineup.avg_ops,
+  ], 4);
+  const starterEra = average([
+    home.starter.xera ?? home.starter.era,
+    away.starter.xera ?? away.starter.era,
+  ], 4);
+  const bullpenEra = average([
+    home.bullpen.era,
+    away.bullpen.era,
+  ], 4);
+
+  if (offenseBase === null || lineupOps === null || starterEra === null || bullpenEra === null) {
+    return null;
+  }
+
+  const offenseRuns = offenseBase * 2;
+  const lineupAdjustment = clamp((lineupOps - 0.71) * 6.5, -0.9, 0.9);
+  const starterAdjustment = clamp((starterEra - 4.1) * 0.28, -0.8, 0.8);
+  const bullpenAdjustment = clamp((bullpenEra - 4.0) * 0.18, -0.5, 0.5);
+  const parkAdjustment = clamp((park - 100) * 0.055, -0.75, 0.75);
+  const weatherAdjustment = clamp(((temp - 70) * 0.018) + (wind >= 10 ? 0.25 : 0) - (rain >= 30 ? 0.35 : 0), -0.6, 0.6);
+
+  return round(clamp(
+    offenseRuns + lineupAdjustment + starterAdjustment + bullpenAdjustment + parkAdjustment + weatherAdjustment,
+    5.5,
+    13.5
+  ), 2);
+}
+
+function buildMoneylineCandidates(game, homeAnalysis, awayAnalysis) {
+  return [homeAnalysis, awayAnalysis].map((row) => ({
+    market_type: 'moneyline',
+    game_id: game.game_id,
+    matchup: `${game.matchup.away.team} @ ${game.matchup.home.team}`,
+    side: row.side,
+    team: row.team,
+    selection_label: row.team,
+    status: marketStatus(row.market_implied_probability !== null && row.edge_vs_market_pct_points !== null, row.edge_vs_market_pct_points, 6, 3),
+    display_signal: signalLabel(row.final_edge_score, row.confidence_score),
+    eligible: row.market_implied_probability !== null && row.edge_vs_market_pct_points !== null,
+    model_value: row.fair_win_probability,
+    market_value: row.market_implied_probability,
+    edge: row.edge_vs_market_pct_points,
+    edge_units: 'pct_points',
+    score: row.final_edge_score,
+    confidence_score: row.confidence_score,
+    volatility_score: row.volatility_score,
+    market_price: row.market_american,
+    flags: row.flags,
+  }));
+}
+
+function buildTotalCandidate(game, home, away, sharedVolatility, sourceConf) {
+  const marketTotal = game.market?.total?.current ?? null;
+  const modelTotal = estimateModelTotal(game, home, away);
+  const edgeRuns = modelTotal !== null && marketTotal !== null ? round(modelTotal - marketTotal, 2) : null;
+  const side = edgeRuns === null ? null : edgeRuns >= 0 ? 'over' : 'under';
+  const confidence = edgeRuns === null
+    ? null
+    : round(clamp((sourceConf * 52) + (Math.abs(edgeRuns) * 14) - (sharedVolatility * 0.12), 20, 78), 2);
+  const score = edgeRuns === null
+    ? null
+    : round((Math.abs(edgeRuns) * 8) + ((confidence || 0) * 0.08) - (sharedVolatility * 0.06), 2);
+  const flags = [];
+  const park = game.advanced_sabermetrics?.park_factor?.overall ?? null;
+  const wind = game.weather?.combined?.wind_speed_mph ?? null;
+  const rain = game.weather?.combined?.rain_probability_pct ?? null;
+  if (park !== null && park >= 104) flags.push('run_environment_boost');
+  if (park !== null && park <= 96) flags.push('run_environment_suppression');
+  if (wind !== null && wind >= 10) flags.push('wind_sensitivity');
+  if (rain !== null && rain >= 30) flags.push('weather_suppression');
+
+  return {
+    market_type: 'total',
+    game_id: game.game_id,
+    matchup: `${game.matchup.away.team} @ ${game.matchup.home.team}`,
+    side,
+    team: null,
+    selection_label: side ? `${side.toUpperCase()} ${marketTotal}` : 'Total unavailable',
+    status: marketStatus(modelTotal !== null && marketTotal !== null, edgeRuns, 0.9, 0.45),
+    display_signal: score === null ? 'Insufficient data' : signalLabel(score, confidence),
+    eligible: modelTotal !== null && marketTotal !== null,
+    model_value: modelTotal,
+    market_value: marketTotal,
+    edge: edgeRuns,
+    edge_units: 'runs',
+    score,
+    confidence_score: confidence,
+    volatility_score: sharedVolatility,
+    market_price: null,
+    flags,
+    methodology: 'experimental_run_environment_total',
+  };
+}
+
+function buildRunLineCandidates(game) {
+  const runLine = game.market?.run_line || game.market?.runline || null;
+  const awayPoints = runLine?.away_points ?? null;
+  const homePoints = runLine?.home_points ?? null;
+  const hasLine = awayPoints !== null || homePoints !== null;
+  return ['away', 'home'].map((side) => {
+    const sideData = game.matchup[side] || {};
+    const points = side === 'away' ? awayPoints : homePoints;
+    const price = side === 'away' ? runLine?.away_price ?? null : runLine?.home_price ?? null;
+    return {
+      market_type: 'run_line',
+      game_id: game.game_id,
+      matchup: `${game.matchup.away.team} @ ${game.matchup.home.team}`,
+      side,
+      team: sideData.team,
+      selection_label: points === null ? `${sideData.team || side} RL unavailable` : `${sideData.team} ${points > 0 ? '+' : ''}${points}`,
+      status: hasLine && price !== null ? 'observation_only' : 'insufficient_market_data',
+      display_signal: hasLine && price !== null ? 'Observation signal' : 'Insufficient data',
+      eligible: hasLine && price !== null,
+      model_value: null,
+      market_value: points,
+      edge: null,
+      edge_units: 'runs',
+      score: null,
+      confidence_score: null,
+      volatility_score: null,
+      market_price: price,
+      flags: hasLine ? [] : ['run_line_unavailable'],
+      methodology: 'awaiting_run_line_price_model',
+    };
+  });
+}
+
 function analyzeGame(game, meta) {
   const total = game.market?.total?.current ?? null;
   const home = buildTeamView(game, 'home');
@@ -549,6 +703,11 @@ function analyzeGame(game, meta) {
   awayAnalysis.risk_factors = buildRiskFactors(game, awayAnalysis);
   homeAnalysis.preliminary_lean = buildLean(homeAnalysis);
   awayAnalysis.preliminary_lean = buildLean(awayAnalysis);
+  const marketCandidates = [
+    ...buildMoneylineCandidates(game, homeAnalysis, awayAnalysis),
+    buildTotalCandidate(game, home, away, sharedVolatility, sourceConf),
+    ...buildRunLineCandidates(game),
+  ];
 
   const rankedSides = [homeAnalysis, awayAnalysis].sort((a, b) => b.final_edge_score - a.final_edge_score);
   const bestSide = rankedSides[0];
@@ -566,11 +725,13 @@ function analyzeGame(game, meta) {
       edge_spread: round(edgeSpread, 4),
       total_environment: {
         market_total: total,
+        model_total: estimateModelTotal(game, home, away),
         park_factor: game.advanced_sabermetrics?.park_factor?.overall ?? null,
         weather_wind_mph: game.weather?.combined?.wind_speed_mph ?? null,
         weather_temp_f: game.weather?.combined?.temperature_f ?? null,
         rain_probability_pct: game.weather?.combined?.rain_probability_pct ?? null,
       },
+      market_candidates: marketCandidates,
       best_edge: {
         side: bestSide.side,
         team: bestSide.team,
@@ -640,6 +801,20 @@ function buildTopEdges(scoredGames) {
     .sort((a, b) => b.final_edge_score - a.final_edge_score);
 }
 
+function buildMarketCandidateRankings(scoredGames) {
+  const candidates = scoredGames
+    .flatMap((game) => game.scoring.market_candidates || [])
+    .filter((row) => row.eligible)
+    .sort((a, b) => Math.abs(b.edge || 0) - Math.abs(a.edge || 0));
+
+  return {
+    all: candidates,
+    moneyline: candidates.filter((row) => row.market_type === 'moneyline'),
+    totals: candidates.filter((row) => row.market_type === 'total'),
+    run_line: candidates.filter((row) => row.market_type === 'run_line'),
+  };
+}
+
 function buildReport(scoredGames, topEdges, meta) {
   const lines = [
     '# MLB Edge Report',
@@ -690,6 +865,7 @@ function main() {
   const dataset = readJson(INPUT_PATH);
   const scoredGames = dataset.games.map((game) => analyzeGame(game, dataset.meta));
   const topEdges = buildTopEdges(scoredGames);
+  const marketCandidateRankings = buildMarketCandidateRankings(scoredGames);
 
   const output = {
     meta: {
@@ -715,6 +891,7 @@ function main() {
           'SQLite/Postgres persistence',
           'Dashboard visualization',
           'EV and CLV tracking',
+          'Multi-market scoring for totals and run line when price depth is available',
         ],
       },
       missing_data: dataset.meta.source_summary?.missing_data || [],
@@ -724,6 +901,9 @@ function main() {
       top_edges: topEdges,
       highest_confidence: [...topEdges].sort((a, b) => b.confidence_score - a.confidence_score).slice(0, 10),
       lowest_volatility: [...topEdges].sort((a, b) => a.volatility_score - b.volatility_score).slice(0, 10),
+      market_candidates: marketCandidateRankings.all.slice(0, 30),
+      totals_candidates: marketCandidateRankings.totals.slice(0, 10),
+      run_line_candidates: marketCandidateRankings.run_line.slice(0, 10),
     },
     games: scoredGames,
   };
