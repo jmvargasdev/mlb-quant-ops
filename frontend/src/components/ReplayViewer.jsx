@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { humanizeFlag } from '../shared/lib/formatters';
 
 function fmt(value, digits = 2) {
@@ -6,30 +5,14 @@ function fmt(value, digits = 2) {
   return Number(value).toFixed(digits);
 }
 
-export default function ReplayViewer({ detail }) {
+export default function ReplayViewer({ detail, frame = 0, setFrame, playing = false, setPlaying, totalFrames: controlledTotalFrames }) {
   const awayFrames = detail?.replay?.away?.snapshots || [];
   const homeFrames = detail?.replay?.home?.snapshots || [];
-  const totalFrames = Math.max(awayFrames.length, homeFrames.length, 1);
-  const [frame, setFrame] = useState(0);
-  const [playing, setPlaying] = useState(false);
+  const totalFrames = controlledTotalFrames || Math.max(awayFrames.length, homeFrames.length, 1);
+  const safeFrame = Math.min(Math.max(frame, 0), Math.max(totalFrames - 1, 0));
 
-  useEffect(() => {
-    setFrame(0);
-  }, [detail?.meta?.game_id]);
-
-  useEffect(() => {
-    if (!playing) return undefined;
-    const timer = window.setInterval(() => {
-      setFrame((current) => {
-        if (current >= totalFrames - 1) return 0;
-        return current + 1;
-      });
-    }, 1400);
-    return () => window.clearInterval(timer);
-  }, [playing, totalFrames]);
-
-  const away = awayFrames[frame] || awayFrames[awayFrames.length - 1] || null;
-  const home = homeFrames[frame] || homeFrames[homeFrames.length - 1] || null;
+  const away = awayFrames[safeFrame] || awayFrames[awayFrames.length - 1] || null;
+  const home = homeFrames[safeFrame] || homeFrames[homeFrames.length - 1] || null;
 
   return (
     <section className="panel rounded-3xl p-5">
@@ -40,7 +23,7 @@ export default function ReplayViewer({ detail }) {
         </div>
         <button
           type="button"
-          onClick={() => setPlaying((current) => !current)}
+          onClick={() => setPlaying?.((current) => !current)}
           className="mono rounded-full border border-slate-500/35 px-4 py-2 text-xs uppercase tracking-[0.2em] text-slate-200"
         >
           {playing ? 'Pause' : 'Play'}
@@ -52,8 +35,8 @@ export default function ReplayViewer({ detail }) {
         type="range"
         min="0"
         max={Math.max(totalFrames - 1, 0)}
-        value={frame}
-        onChange={(event) => setFrame(Number(event.target.value))}
+        value={safeFrame}
+        onChange={(event) => setFrame?.(Number(event.target.value))}
       />
 
       <div className="mt-5 grid gap-4 xl:grid-cols-2">
