@@ -447,8 +447,8 @@ export default function OpsBoard({ overview, onSelect }) {
   const sections = overview?.sections || {};
   return (
     <div className="grid gap-5">
-      <SlateSignalMap sections={sections} />
       <MultiMarketSignals summary={overview?.multi_market_summary} />
+      <SlateSignalMap sections={sections} />
       <Section
         title="Priority Signals"
         subtitle="Highest priority model signals for the current snapshot window."
