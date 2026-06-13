@@ -457,6 +457,10 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
   const refreshMs = overview?.meta?.refresh_policy?.interval_ms || 120000;
   const { data, status: panelStatus } = useDecisionPanel(active, refreshMs);
 
+  const picks = overview?.sections?.top_bettable || [];
+  const [selectedPickKey, setSelectedPickKey] = useState(null);
+  const activePickKey = selectedPickKey || (picks[0] ? `${picks[0].game_id}|${picks[0].selection_side}` : null);
+
   const [alertBanner, setAlertBanner] = useState(null);
   const bannerTimerRef = useRef(null);
 
@@ -501,7 +505,11 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
   const executiveMemo = executive.executive_memo || {};
   const deployment = executive.deployment_evaluation || {};
   const structures = data?.best_structures || [];
-  const primaryAllocation = executive.primary_allocation || resolvePrimaryAllocation(allocationRows);
+  const resolvedPrimary = executive.primary_allocation || resolvePrimaryAllocation(allocationRows);
+  const pickedAllocation = activePickKey
+    ? allocationRows.find((r) => `${r.game_id}|${r.side}` === activePickKey) || null
+    : null;
+  const primaryAllocation = pickedAllocation || resolvedPrimary;
   const policyGates = executive.policy_gates || [];
   const decisionLedger = data?.decision_ledger || {};
   const learning = data?.learning_observability || {};
@@ -546,6 +554,34 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
             title={t('decision.title')}
             subtitle={t('decision.subtitle')}
           >
+            {picks.length > 1 && (
+              <div className="mb-4 flex flex-wrap gap-2">
+                {picks.map((pick) => {
+                  const key = `${pick.game_id}|${pick.selection_side}`;
+                  const isActive = key === activePickKey;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSelectedPickKey(key)}
+                      className={`rounded-2xl border px-3 py-2 text-left transition ${
+                        isActive
+                          ? 'border-emerald-400/50 bg-emerald-400/10'
+                          : 'border-slate-700/35 bg-slate-900/30 hover:border-emerald-400/30'
+                      }`}
+                    >
+                      <div className="mono text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                        {pick.selection_side === 'away' ? 'Away' : 'Home'}
+                      </div>
+                      <div className="mt-0.5 text-sm font-semibold text-white">{pick.selection_team}</div>
+                      <div className="mono mt-0.5 text-[11px] text-emerald-300">
+                        Edge {pick.quant_score?.toFixed(1)}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
               <div className="rounded-3xl border border-emerald-300/20 bg-emerald-300/6 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
