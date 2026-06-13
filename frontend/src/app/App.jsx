@@ -18,6 +18,7 @@ import ResponsibleUseWorkspace from '../workspaces/responsible-use/ResponsibleUs
 import AnalyticsWorkspace from '../workspaces/analytics/AnalyticsWorkspace';
 import { fmt, timeAgo } from '../shared/lib/formatters';
 import { useLanguage } from '../shared/i18n/LanguageProvider';
+import { useAnalyticsTracker } from '../shared/hooks/useAnalyticsTracker';
 
 function WorkspaceRenderer({ workspaceId, overview, detail, onSelectGame, onChangeWorkspace, status }) {
   switch (workspaceId) {
@@ -73,6 +74,7 @@ export default function App() {
     setFocusedGameId,
   } = useWorkspaceState(initialGameId);
   const { detail, error } = useFocusedGame(focusedGameId, safeOverview.meta?.latest_snapshot_signature);
+  useAnalyticsTracker(workspaceId);
 
   const resolvedWorkspace = localizeWorkspace(workspaceById(workspaceId), t);
   const pipelineHealth = safeOverview.operational_health?.pipeline_health_score;

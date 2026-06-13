@@ -55,6 +55,7 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use(express.json());
 app.use(createAnalyticsMiddleware(config.storage.sqlitePath));
 app.use('/api/portal', portalRoutes);
 app.use('/api/analytics', analyticsRoutes);
