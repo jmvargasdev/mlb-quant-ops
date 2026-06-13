@@ -1626,9 +1626,9 @@ function buildPerformanceDashboard(date = loadCoreState().date, learningObservab
 
   const performanceWindows = [
     { key: 'today',  label: 'Today',  span: '1D',  ...veToday,  roi_pct: null, note: 'Current session signals.' },
-    { key: '7d',     label: '7D',     span: '7D',  ...ve7d,     roi_pct: roi7d,    note: 'Q-Kelly cap 10% simulated on 7d signals.' },
-    { key: '30d',    label: '30D',    span: '30D', ...ve30d,    roi_pct: roi30d,   note: 'Q-Kelly cap 10% simulated on 30d signals.' },
-    { key: 'season', label: 'Season', span: 'SZN', ...veSeason, roi_pct: roiSeason, note: 'Q-Kelly cap 10% simulated — full historical sample.' },
+    { key: '7d',     label: '7D',     span: '7D',  ...ve7d,     roi_pct: roi7d,    note: 'Q-Kelly cap 10% backtested on 7d Validated Edge signals.' },
+    { key: '30d',    label: '30D',    span: '30D', ...ve30d,    roi_pct: roi30d,   note: 'Q-Kelly cap 10% backtested on 30d Validated Edge signals.' },
+    { key: 'season', label: 'Season', span: 'SZN', ...veSeason, roi_pct: roiSeason, note: 'Q-Kelly cap 10% backtested — full Validated Edge historical sample.' },
   ];
 
   const status = veSeason.complete > 0 ? 'tracking_results'
