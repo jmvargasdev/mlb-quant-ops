@@ -2275,11 +2275,50 @@ function buildQuantReportMarkdown() {
   };
 }
 
+function loadTodayLedgerIndex(date) {
+  const ledgerPath = path.join(ROOT, 'mlb_ops', 'historical', 'decision_ledger', `${date}.jsonl`);
+  if (!fs.existsSync(ledgerPath)) return new Map();
+  const index = new Map();
+  try {
+    const lines = fs.readFileSync(ledgerPath, 'utf8').trim().split('\n');
+    for (const l of lines) {
+      try {
+        const r = JSON.parse(l);
+        const key = `${r.game_id}|${r.side}`;
+        // Keep latest entry per game+side
+        if (!index.has(key) || r.source_signature > index.get(key).source_signature) {
+          index.set(key, r);
+        }
+      } catch {}
+    }
+  } catch {}
+  return index;
+}
+
+function isValidatedEdge(ledgerEntry) {
+  if (!ledgerEntry) return false;
+  return ledgerEntry.action === 'Wait for Confirmation' ||
+    ledgerEntry.conviction_tier === 'Supportive';
+}
+
 function buildOverview() {
   const state = loadCoreState();
   const maps = buildMaps(state);
   const scoredGames = state.scored?.games || [];
-  const cards = scoredGames.map((game) => buildGameCard(game, maps)).filter(Boolean);
+  const rawCards = scoredGames.map((game) => buildGameCard(game, maps)).filter(Boolean);
+
+  // Align priority signal with Validated Edge: only promote top_bettable cards
+  // confirmed by the decision ledger as WFC or Supportive conviction
+  const ledgerIndex = loadTodayLedgerIndex(state.date);
+  const cards = rawCards.map((card) => {
+    if (card.category !== 'top_bettable') return card;
+    const ledgerEntry = ledgerIndex.get(`${card.game_id}|${card.selection_side}`);
+    if (!isValidatedEdge(ledgerEntry)) {
+      return { ...card, category: 'watchlist' };
+    }
+    return card;
+  });
+
   const topBettable = cards.filter((card) => card.category === 'top_bettable').sort((a, b) => b.quant_score - a.quant_score);
   const watchlist = cards.filter((card) => card.category === 'watchlist').sort((a, b) => b.edge_pct_points - a.edge_pct_points);
   const noAction = cards.filter((card) => card.category === 'no_action').sort((a, b) => b.persistence_score - a.persistence_score);
