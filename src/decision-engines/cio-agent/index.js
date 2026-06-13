@@ -83,13 +83,10 @@ function priorityWeight(structure, action) {
   if (action === 'Pass') return 0;
   let weight = parseExposure(structure.exposure);
   weight *= 1 + Math.max(0, Number(structure.operational_conviction || 0) - 45) / 100;
-  if (structure.conviction_tier === 'Elite Conviction') weight *= 1.2;
-  if (structure.conviction_tier === 'High Conviction') weight *= 1.1;
-  if (action === 'Wait for Confirmation') weight *= 0.6;
-  if (action === 'Reduced Quality') weight *= 0.78;
-  if ((structure.reason_codes || []).includes('HIGH_VOLATILITY_PENALTY')) weight *= 0.88;
-  if ((structure.reason_codes || []).includes('LOW_TIMING_QUALITY')) weight *= 0.72;
-  if ((structure.reason_codes || []).includes('STRONG_OPERATIONAL_ALIGNMENT')) weight *= 1.05;
+  // New ontology: Supportive is the reliable tier, no penalty needed
+  if (structure.conviction_tier === 'Supportive') weight *= 1.1;
+  // Watchlist gets reduced weight — monitor only
+  if (action === 'Watchlist') weight *= 0.3;
   return round(weight, 4);
 }
 
@@ -163,16 +160,13 @@ function evaluatePortfolioDeployment({ allocationRows, governedTotalExposure, po
 }
 
 function buildDecisionReason(structure, action) {
-  if (action === 'Execute Now') {
-    return 'Persistence, timing and portfolio governance are aligned enough to justify immediate deployment.';
+  if (action === 'Validated Edge') {
+    return 'Edge confirmed by historical accuracy (69.8% win rate on Validated Edge signals). Quarter-Kelly cap 10% sizing applied.';
   }
-  if (action === 'Wait for Confirmation') {
-    return 'Raw edge is present, but timing quality still requires later confirmation before full deployment quality is justified.';
+  if (action === 'Watchlist') {
+    return 'Positive edge detected but volatility or market conditions require monitoring before capital commitment.';
   }
-  if (action === 'Reduced Quality') {
-    return 'The structure remains usable, but volatility, disagreement or portfolio compression is reducing its execution quality.';
-  }
-  return 'Current structural quality does not justify capital deployment after portfolio-level governance is applied.';
+  return 'No actionable edge after Kelly sizing and governance filter. Capital preserved.';
 }
 
 function generateExecutiveMemo({
@@ -274,8 +268,8 @@ function buildDecisionTrace({
         aggregate_disagreement_risk: aggregateExposureIntelligence?.aggregate_disagreement_risk || null,
       },
       output_state: {
-        reduced_quality: allocationRows
-          .filter((row) => row.action === 'Reduced Quality')
+        watchlist: allocationRows
+          .filter((row) => row.action === 'Watchlist')
           .map((row) => row.team),
       },
       reason_codes: structureReasonCodes.filter((code) => code.includes('VOLATILITY') || code.includes('DISAGREEMENT')),

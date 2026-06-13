@@ -1,15 +1,14 @@
 const ACTIONS = {
-  EXECUTE_NOW: 'Execute Now',
-  REDUCED_QUALITY: 'Reduced Quality',
-  WAIT_FOR_CONFIRMATION: 'Wait for Confirmation',
+  VALIDATED_EDGE: 'Validated Edge',
+  WATCHLIST: 'Watchlist',
   PASS: 'Pass',
 };
 
 const POLICY_CODES = {
-  PASS_CANNOT_BE_PRIMARY: 'PASS_CANNOT_BE_PRIMARY',
-  UNSTABLE_CANNOT_FULL_DEPLOY: 'UNSTABLE_CANNOT_FULL_DEPLOY',
-  LOW_TIMING_REQUIRES_CONFIRMATION: 'LOW_TIMING_REQUIRES_CONFIRMATION',
-  HIGH_VOLATILITY_REDUCES_QUALITY: 'HIGH_VOLATILITY_REDUCES_QUALITY',
+  NO_EDGE: 'NO_EDGE',
+  EDGE_COLLAPSED: 'EDGE_COLLAPSED',
+  HIGH_VOLATILITY_WATCHLIST: 'HIGH_VOLATILITY_WATCHLIST',
+  VALIDATED_EDGE_CONFIRMED: 'VALIDATED_EDGE_CONFIRMED',
 };
 
 function parseExposure(exposure) {
@@ -18,117 +17,85 @@ function parseExposure(exposure) {
 }
 
 function actionPriority(action) {
-  if (action === ACTIONS.EXECUTE_NOW) return 4;
-  if (action === ACTIONS.WAIT_FOR_CONFIRMATION) return 3;
-  if (action === ACTIONS.REDUCED_QUALITY) return 2;
+  if (action === ACTIONS.VALIDATED_EDGE) return 4;
+  if (action === ACTIONS.WATCHLIST) return 1;
   if (action === ACTIONS.PASS) return 0;
-  return 1;
+  // Legacy action names — map to new ontology for backward compat
+  if (action === 'Execute Now') return 4;
+  if (action === 'Wait for Confirmation') return 4;
+  if (action === 'Reduced Quality') return 1;
+  return 0;
 }
 
 function tierPriority(tier) {
-  if (tier === 'Elite Conviction') return 5;
-  if (tier === 'High Conviction') return 4;
-  if (tier === 'Supportive') return 3;
-  if (tier === 'Speculative') return 2;
-  if (tier === 'Watchlist') return 1;
+  if (tier === 'Supportive') return 4;
+  if (tier === 'Watchlist' || tier === 'Speculative') return 2;
   return 0;
 }
 
 function passedGate(code, evidence = {}) {
-  return {
-    code,
-    status: 'passed',
-    effect: 'none',
-    severity: 'info',
-    evidence,
-  };
+  return { code, status: 'passed', effect: 'none', severity: 'info', evidence };
 }
 
 function activeGate(code, effect, severity, evidence = {}) {
-  return {
-    code,
-    status: 'active',
-    effect,
-    severity,
-    evidence,
-  };
+  return { code, status: 'active', effect, severity, evidence };
 }
 
 function evaluateStructurePolicies(structure, aggressionState) {
-  const gates = [];
   const exposure = parseExposure(structure.exposure);
-  const reasonCodes = structure.reason_codes || [];
-  const timingScore = Number(structure.timing_quality_score || 0);
-  const volatilityScore = Number(structure.volatility_score || 0);
-  const disagreementScore = Number(structure.disagreement_score || 0);
 
-  if (exposure <= 0 || structure.lifecycle === 'collapsing' || structure.validation_bucket === 'rejected') {
-    gates.push(activeGate('STRUCTURE_NOT_DEPLOYABLE', 'pass', 'critical', {
-      exposure: structure.exposure,
-      lifecycle: structure.lifecycle || null,
-      validation_bucket: structure.validation_bucket || null,
-    }));
+  // Gate 1: No edge from Kelly sizing → Pass
+  if (exposure <= 0) {
     return {
       action: ACTIONS.PASS,
-      gates,
+      gates: [activeGate(POLICY_CODES.NO_EDGE, 'pass', 'critical', {
+        exposure: structure.exposure,
+        fair_probability: structure.fair_probability ?? null,
+        market_probability: structure.market_probability ?? null,
+      })],
     };
   }
 
-  if (reasonCodes.includes('LATE_CONFIRMATION_REQUIRED') || timingScore < 20) {
-    gates.push(activeGate(POLICY_CODES.LOW_TIMING_REQUIRES_CONFIRMATION, 'downgrade_to_wait', 'warning', {
-      timing_quality_score: structure.timing_quality_score ?? null,
-      reason_codes: reasonCodes,
-    }));
+  // Gate 2: Edge is dead (collapsing or rejected validation) → Pass
+  if (structure.lifecycle === 'collapsing' || structure.validation_bucket === 'rejected') {
     return {
-      action: ACTIONS.WAIT_FOR_CONFIRMATION,
-      gates,
+      action: ACTIONS.PASS,
+      gates: [activeGate(POLICY_CODES.EDGE_COLLAPSED, 'pass', 'critical', {
+        lifecycle: structure.lifecycle || null,
+        validation_bucket: structure.validation_bucket || null,
+      })],
     };
   }
 
-  if (volatilityScore >= 14) {
-    gates.push(activeGate(POLICY_CODES.HIGH_VOLATILITY_REDUCES_QUALITY, 'downgrade_to_reduced_quality', 'warning', {
-      volatility_score: structure.volatility_score ?? null,
-    }));
-  }
-
-  if (aggressionState === 'Restricted') {
-    gates.push(activeGate(POLICY_CODES.UNSTABLE_CANNOT_FULL_DEPLOY, 'downgrade_to_reduced_quality', 'warning', {
-      aggression_state: aggressionState,
-    }));
-  }
-
-  if (disagreementScore >= 0.05) {
-    gates.push(activeGate('HIGH_DISAGREEMENT_REDUCES_QUALITY', 'downgrade_to_reduced_quality', 'warning', {
-      disagreement_score: structure.disagreement_score ?? null,
-    }));
-  }
-
-  if (gates.some((gate) => gate.status === 'active')) {
+  // Gate 3: High volatility or restricted aggression → Watchlist (monitor, no commitment)
+  const volatilityScore = Number(structure.volatility_score || 0);
+  if (volatilityScore >= 14 || aggressionState === 'Restricted') {
     return {
-      action: ACTIONS.REDUCED_QUALITY,
-      gates,
-    };
-  }
-
-  return {
-    action: ACTIONS.EXECUTE_NOW,
-    gates: [
-      passedGate(POLICY_CODES.LOW_TIMING_REQUIRES_CONFIRMATION, {
-        timing_quality_score: structure.timing_quality_score ?? null,
-      }),
-      passedGate(POLICY_CODES.HIGH_VOLATILITY_REDUCES_QUALITY, {
+      action: ACTIONS.WATCHLIST,
+      gates: [activeGate(POLICY_CODES.HIGH_VOLATILITY_WATCHLIST, 'watchlist', 'warning', {
         volatility_score: structure.volatility_score ?? null,
-      }),
-    ],
+        aggression_state: aggressionState,
+      })],
+    };
+  }
+
+  // Validated Edge: positive Kelly edge, not collapsed, stable volatility
+  return {
+    action: ACTIONS.VALIDATED_EDGE,
+    gates: [passedGate(POLICY_CODES.VALIDATED_EDGE_CONFIRMED, {
+      exposure: structure.exposure,
+      fair_probability: structure.fair_probability ?? null,
+      market_probability: structure.market_probability ?? null,
+      volatility_score: structure.volatility_score ?? null,
+    })],
   };
 }
 
 function selectPrimaryAllocation(allocationRows) {
   return [...(allocationRows || [])]
-    .filter((row) => row.action !== ACTIONS.PASS && parseExposure(row.executive_exposure) > 0)
+    .filter((row) => actionPriority(row.action) >= 4 && parseExposure(row.executive_exposure) > 0)
     .sort((a, b) => (
-      actionPriority(b.action) - actionPriority(a.action)
-      || parseExposure(b.executive_exposure) - parseExposure(a.executive_exposure)
+      parseExposure(b.executive_exposure) - parseExposure(a.executive_exposure)
       || tierPriority(b.conviction_tier) - tierPriority(a.conviction_tier)
       || Number(b.operational_conviction || 0) - Number(a.operational_conviction || 0)
     ))[0] || null;
@@ -136,37 +103,23 @@ function selectPrimaryAllocation(allocationRows) {
 
 function evaluateExecutivePolicyGates({ allocationRows, primaryAllocation }) {
   const primaryCandidate = primaryAllocation || selectPrimaryAllocation(allocationRows);
-  const passPrimaryViolation = primaryCandidate?.action === ACTIONS.PASS;
-  const activeRows = allocationRows.filter((row) => row.action !== ACTIONS.PASS);
-  const waitRows = allocationRows.filter((row) => row.action === ACTIONS.WAIT_FOR_CONFIRMATION);
-  const reducedRows = allocationRows.filter((row) => row.action === ACTIONS.REDUCED_QUALITY);
+  const hasValidatedEdge = allocationRows.some((row) => row.action === ACTIONS.VALIDATED_EDGE);
+  const watchlistRows = allocationRows.filter((row) => row.action === ACTIONS.WATCHLIST);
 
   return [
-    passPrimaryViolation
-      ? activeGate(POLICY_CODES.PASS_CANNOT_BE_PRIMARY, 'block_primary_allocation', 'critical', {
-        primary_game_id: primaryCandidate?.game_id || null,
-        primary_team: primaryCandidate?.team || null,
-        primary_action: primaryCandidate?.action || null,
-      })
-      : passedGate(POLICY_CODES.PASS_CANNOT_BE_PRIMARY, {
-        primary_game_id: primaryCandidate?.game_id || null,
-        primary_team: primaryCandidate?.team || null,
-        primary_action: primaryCandidate?.action || null,
-      }),
-    waitRows.length
-      ? activeGate(POLICY_CODES.LOW_TIMING_REQUIRES_CONFIRMATION, 'requires_confirmation_before_full_deployment', 'warning', {
-        affected_structures: waitRows.map((row) => row.team),
-      })
-      : passedGate(POLICY_CODES.LOW_TIMING_REQUIRES_CONFIRMATION, {
-        active_structures: activeRows.length,
-      }),
-    reducedRows.length
-      ? activeGate(POLICY_CODES.HIGH_VOLATILITY_REDUCES_QUALITY, 'compress_or_reduce_quality', 'warning', {
-        affected_structures: reducedRows.map((row) => row.team),
-      })
-      : passedGate(POLICY_CODES.HIGH_VOLATILITY_REDUCES_QUALITY, {
-        active_structures: activeRows.length,
-      }),
+    hasValidatedEdge
+      ? passedGate(POLICY_CODES.VALIDATED_EDGE_CONFIRMED, {
+          primary_team: primaryCandidate?.team || null,
+          primary_action: primaryCandidate?.action || null,
+        })
+      : activeGate(POLICY_CODES.NO_EDGE, 'no_primary_allocation', 'warning', {
+          primary_team: primaryCandidate?.team || null,
+        }),
+    watchlistRows.length
+      ? activeGate(POLICY_CODES.HIGH_VOLATILITY_WATCHLIST, 'monitoring_only', 'info', {
+          affected_structures: watchlistRows.map((row) => row.team),
+        })
+      : passedGate(POLICY_CODES.HIGH_VOLATILITY_WATCHLIST, {}),
   ];
 }
 

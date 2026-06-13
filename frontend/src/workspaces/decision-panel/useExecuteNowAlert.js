@@ -50,11 +50,13 @@ export function useExecuteNowAlert(allocationRows, date, onNewSignals) {
   useEffect(() => {
     if (!allocationRows?.length || !date) return;
 
-    const executeNow = allocationRows.filter((r) => r.action === 'Execute Now');
-    if (!executeNow.length) return;
+    const validatedEdge = allocationRows.filter((r) =>
+      r.action === 'Validated Edge' || r.action === 'Execute Now'
+    );
+    if (!validatedEdge.length) return;
 
     const notified = loadNotified(date);
-    const newSignals = executeNow.filter((r) => {
+    const newSignals = validatedEdge.filter((r) => {
       const key = r.source_signature || `${r.game_id}:${r.side}:${r.generated_at}`;
       return !notified.has(key);
     });

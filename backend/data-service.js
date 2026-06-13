@@ -1571,12 +1571,35 @@ function computeWindowStats(rows, sinceDaysAgo) {
   };
 }
 
+function kellyBacktestRoi(signals, capFraction = 0.10) {
+  if (!signals || signals.length === 0) return null;
+  const sorted = [...signals].sort((a, b) => a.date.localeCompare(b.date));
+  let bank = 100;
+  const results = [];
+  for (const r of sorted) {
+    const won = r.win_loss === 'win';
+    const dec = getHistoricalOdds(r.date, r.game_id, r.side) || 1.91;
+    const b = dec - 1;
+    const prev = results.slice(-20);
+    const p = prev.length >= 5 ? prev.filter(x => x.won).length / prev.length : 0.715;
+    const q = 1 - p;
+    const qk = Math.max(0, (p * b - q) / b) * 0.25;
+    const f = Math.min(qk, capFraction);
+    const stake = bank * f;
+    bank += won ? stake * b : -stake;
+    results.push({ won });
+  }
+  return round(bank - 100, 1);
+}
+
 function buildPerformanceDashboard(date = loadCoreState().date, learningObservability = null) {
   const learning = learningObservability || buildLearningObservability(date, {});
   const allRows = loadHistoricalOutcomeRows();
 
   const VALIDATED_EDGE = r =>
-    r.action === 'Wait for Confirmation' || r.conviction_tier === 'Supportive';
+    r.action === 'Validated Edge' ||
+    r.action === 'Wait for Confirmation' ||
+    r.conviction_tier === 'Supportive';
   const NO_ACTION = r =>
     ['Execute Now', 'Reduced Quality'].includes(r.action) ||
     ['Elite Conviction', 'High Conviction', 'Unstable', 'Decaying'].includes(r.conviction_tier);
@@ -1590,18 +1613,20 @@ function buildPerformanceDashboard(date = loadCoreState().date, learningObservab
   const veToday = computeWindowStats(veRows.filter(r => r.date === date), null);
   const naSeason = computeWindowStats(naRows, null);
 
-  // Theoretical edge per unit at avg -110 odds (b=0.909): roi = (p*0.909 - q) * 100
-  function edgeRoiPct(stats) {
-    if (!stats.accuracy) return null;
-    const p = stats.accuracy / 100;
-    return round((p * 0.909 - (1 - p)) * 100, 1);
-  }
+  // Run Q-Kelly cap 10% backtest per window to get ROI consistent with backtest analysis
+  const cutoff7d  = new Date(Date.now() - 7  * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const cutoff30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const veComplete = veRows.filter(r => r.win_loss !== null);
+
+  const roi7d    = kellyBacktestRoi(veComplete.filter(r => r.date >= cutoff7d));
+  const roi30d   = kellyBacktestRoi(veComplete.filter(r => r.date >= cutoff30d));
+  const roiSeason = kellyBacktestRoi(veComplete);
 
   const performanceWindows = [
-    { key: 'today',  label: 'Today',  span: '1D',  ...veToday,  roi_pct: edgeRoiPct(veToday),  note: 'Current session signals.' },
-    { key: '7d',     label: '7D',     span: '7D',  ...ve7d,     roi_pct: edgeRoiPct(ve7d),     note: 'Short rolling context.' },
-    { key: '30d',    label: '30D',    span: '30D', ...ve30d,    roi_pct: edgeRoiPct(ve30d),    note: 'Current operating window.' },
-    { key: 'season', label: 'Season', span: 'SZN', ...veSeason, roi_pct: edgeRoiPct(veSeason), note: 'Full data sample.' },
+    { key: 'today',  label: 'Today',  span: '1D',  ...veToday,  roi_pct: null, note: 'Current session signals.' },
+    { key: '7d',     label: '7D',     span: '7D',  ...ve7d,     roi_pct: roi7d,    note: 'Q-Kelly cap 10% simulated on 7d signals.' },
+    { key: '30d',    label: '30D',    span: '30D', ...ve30d,    roi_pct: roi30d,   note: 'Q-Kelly cap 10% simulated on 30d signals.' },
+    { key: 'season', label: 'Season', span: 'SZN', ...veSeason, roi_pct: roiSeason, note: 'Q-Kelly cap 10% simulated — full historical sample.' },
   ];
 
   const status = veSeason.complete > 0 ? 'tracking_results'
@@ -1637,7 +1662,7 @@ function buildPerformanceDashboard(date = loadCoreState().date, learningObservab
     sample_size: veSeason.sample_size,
     complete_outcomes: veSeason.complete,
     pending_outcomes: veSeason.pending,
-    realized_roi_pct: edgeRoiPct(veSeason),
+    realized_roi_pct: roiSeason,
     trust: {
       ledger_coverage: learning.decision_ledger.coverage,
       contract_validation: learning.contract_validation.status,
@@ -2316,7 +2341,8 @@ function loadTodayLedgerIndex(date) {
 
 function isValidatedEdge(ledgerEntry) {
   if (!ledgerEntry) return false;
-  return ledgerEntry.action === 'Wait for Confirmation' ||
+  return ledgerEntry.action === 'Validated Edge' ||
+    ledgerEntry.action === 'Wait for Confirmation' ||
     ledgerEntry.conviction_tier === 'Supportive';
 }
 
@@ -2605,7 +2631,10 @@ function getHistoricalOdds(date, gameId, side) {
 
 function buildModelAnalysis() {
   const allRows = loadHistoricalOutcomeRows();
-  const VALIDATED = r => r.action === 'Wait for Confirmation' || r.conviction_tier === 'Supportive';
+  const VALIDATED = r =>
+    r.action === 'Validated Edge' ||
+    r.action === 'Wait for Confirmation' ||
+    r.conviction_tier === 'Supportive';
   const veRows = allRows.filter(VALIDATED);
   const signals = veRows
     .filter(r => r.win_loss !== null)
@@ -2707,7 +2736,7 @@ function buildModelAnalysis() {
 
   return {
     generated_at: new Date().toISOString(),
-    signal_universe: 'Validated Edge (Wait for Confirmation + Supportive)',
+    signal_universe: 'Validated Edge (action=Validated Edge | WFC legacy | conviction_tier=Supportive)',
     total_signals: n,
     wins,
     losses: n - wins,

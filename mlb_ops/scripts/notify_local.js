@@ -38,21 +38,23 @@ function playAlert(seconds) {
 
 function main() {
   const rows = readLedger(DATE);
-  const executeNow = rows.filter((r) => r.action === 'Execute Now');
+  const validatedEdge = rows.filter((r) =>
+    r.action === 'Validated Edge' || r.action === 'Execute Now'
+  );
 
-  if (!executeNow.length) {
-    console.log(JSON.stringify({ date: DATE, status: 'no_signal', message: 'No Execute Now actions in ledger.' }));
+  if (!validatedEdge.length) {
+    console.log(JSON.stringify({ date: DATE, status: 'no_signal', message: 'No Validated Edge signals in ledger.' }));
     return;
   }
 
   const notified = readNotified();
-  const newSignals = executeNow.filter((r) => {
+  const newSignals = validatedEdge.filter((r) => {
     const key = r.source_signature || `${r.game_id}:${r.side}:${r.generated_at}`;
     return !notified.keys.includes(key);
   });
 
   if (!newSignals.length) {
-    console.log(JSON.stringify({ date: DATE, status: 'already_notified', total: executeNow.length }));
+    console.log(JSON.stringify({ date: DATE, status: 'already_notified', total: validatedEdge.length }));
     return;
   }
 
