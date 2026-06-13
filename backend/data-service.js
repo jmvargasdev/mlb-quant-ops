@@ -1590,11 +1590,18 @@ function buildPerformanceDashboard(date = loadCoreState().date, learningObservab
   const veToday = computeWindowStats(veRows.filter(r => r.date === date), null);
   const naSeason = computeWindowStats(naRows, null);
 
+  // Theoretical edge per unit at avg -110 odds (b=0.909): roi = (p*0.909 - q) * 100
+  function edgeRoiPct(stats) {
+    if (!stats.accuracy) return null;
+    const p = stats.accuracy / 100;
+    return round((p * 0.909 - (1 - p)) * 100, 1);
+  }
+
   const performanceWindows = [
-    { key: 'today',  label: 'Today',  span: '1D',  ...veToday,  note: 'Current session signals.' },
-    { key: '7d',     label: '7D',     span: '7D',  ...ve7d,     note: 'Short rolling context.' },
-    { key: '30d',    label: '30D',    span: '30D', ...ve30d,    note: 'Current operating window.' },
-    { key: 'season', label: 'Season', span: 'SZN', ...veSeason, note: 'Full data sample.' },
+    { key: 'today',  label: 'Today',  span: '1D',  ...veToday,  roi_pct: edgeRoiPct(veToday),  note: 'Current session signals.' },
+    { key: '7d',     label: '7D',     span: '7D',  ...ve7d,     roi_pct: edgeRoiPct(ve7d),     note: 'Short rolling context.' },
+    { key: '30d',    label: '30D',    span: '30D', ...ve30d,    roi_pct: edgeRoiPct(ve30d),    note: 'Current operating window.' },
+    { key: 'season', label: 'Season', span: 'SZN', ...veSeason, roi_pct: edgeRoiPct(veSeason), note: 'Full data sample.' },
   ];
 
   const status = veSeason.complete > 0 ? 'tracking_results'
@@ -1630,7 +1637,7 @@ function buildPerformanceDashboard(date = loadCoreState().date, learningObservab
     sample_size: veSeason.sample_size,
     complete_outcomes: veSeason.complete,
     pending_outcomes: veSeason.pending,
-    realized_roi_pct: round(veSeason.profit_loss_proxy * 2, 2),
+    realized_roi_pct: edgeRoiPct(veSeason),
     trust: {
       ledger_coverage: learning.decision_ledger.coverage,
       contract_validation: learning.contract_validation.status,
