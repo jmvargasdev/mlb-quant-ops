@@ -108,7 +108,20 @@ function compressExposure({ structures, governedTotalExposure, maxSingleExposure
   let remaining = round(governedTotalExposure, 2);
 
   const allocated = candidates.map((row) => {
-    if (row.priority_weight <= 0 || totalWeight <= 0 || remaining <= 0) {
+    // Validated Edge: Kelly already handles per-signal risk.
+    // Bypass governance compression — use raw Kelly sizing directly.
+    // See ADR-001 and backtest: governance was not part of the +1843% result.
+    if (row.action === 'Validated Edge') {
+      const kellyUnits = round(row.base_units, 4);
+      return {
+        ...row,
+        executive_exposure_units: kellyUnits,
+        executive_exposure: formatExposure(kellyUnits),
+      };
+    }
+
+    // Watchlist and Pass: no capital deployed
+    if (row.action === 'Watchlist' || row.priority_weight <= 0) {
       return {
         ...row,
         executive_exposure_units: 0,
@@ -116,6 +129,10 @@ function compressExposure({ structures, governedTotalExposure, maxSingleExposure
       };
     }
 
+    // Legacy actions: preserve old governance compression behavior
+    if (totalWeight <= 0 || remaining <= 0) {
+      return { ...row, executive_exposure_units: 0, executive_exposure: '0.00u' };
+    }
     const proportional = governedTotalExposure * (row.priority_weight / totalWeight);
     const bounded = Math.min(row.base_units, capPerStructure || row.base_units, proportional);
     const floored = floorToQuarter(bounded);
@@ -126,19 +143,6 @@ function compressExposure({ structures, governedTotalExposure, maxSingleExposure
       executive_exposure: formatExposure(floored),
     };
   });
-
-  let residual = round(governedTotalExposure - allocated.reduce((sum, row) => sum + row.executive_exposure_units, 0), 2);
-  if (residual >= 0.24) {
-    for (const row of allocated) {
-      if (residual < 0.24) break;
-      const current = row.executive_exposure_units;
-      const cap = Math.min(row.base_units, capPerStructure || row.base_units);
-      if (row.action === 'Pass' || current + 0.25 > cap + 1e-9) continue;
-      row.executive_exposure_units = round(current + 0.25, 2);
-      row.executive_exposure = formatExposure(row.executive_exposure_units);
-      residual = round(residual - 0.25, 2);
-    }
-  }
 
   return allocated;
 }
