@@ -1386,6 +1386,7 @@ function buildDecisionLedgerRows({
       side: row.side,
       action: row.action,
       executive_exposure: row.executive_exposure,
+      kelly_exposure: evidence.exposure || null,
       raw_exposure: row.raw_exposure,
       conviction_tier: row.conviction_tier,
       reason: row.reason,

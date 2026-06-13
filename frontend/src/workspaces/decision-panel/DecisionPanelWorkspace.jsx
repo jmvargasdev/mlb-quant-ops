@@ -263,11 +263,10 @@ function findAllocationForStructure(rows, structure) {
 
 function resolveHighConvictionSignals(rows) {
   return [...(rows || [])]
-    .filter((row) => ['Elite Conviction', 'High Conviction'].includes(row.conviction_tier))
+    .filter((row) => row.action === 'Validated Edge' || row.action === 'Wait for Confirmation')
     .sort((a, b) => (
-      tierPriority(b.conviction_tier) - tierPriority(a.conviction_tier)
-      || actionPriority(b.action) - actionPriority(a.action)
-      || exposureUnits(b.executive_exposure) - exposureUnits(a.executive_exposure)
+      exposureUnits(b.kelly_exposure || b.executive_exposure) - exposureUnits(a.kelly_exposure || a.executive_exposure)
+      || tierPriority(b.conviction_tier) - tierPriority(a.conviction_tier)
     ));
 }
 
@@ -595,17 +594,21 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
                   </SignalPill>
                 </div>
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-emerald-300/20 bg-slate-950/35 px-4 py-3">
-                    <div className="mono text-[10px] uppercase tracking-[0.2em] text-slate-500">{t('decision.executiveExposure')}</div>
-                    <div className="mt-1 text-xl font-semibold text-white">{primaryAllocation?.executive_exposure || '0.00u'}</div>
+                  <div className="rounded-2xl border border-emerald-300/30 bg-emerald-300/8 px-4 py-3">
+                    <div className="mono text-[10px] uppercase tracking-[0.2em] text-emerald-400">Q-Kelly Size</div>
+                    <div className="mt-1 text-xl font-semibold text-white">
+                      {primaryAllocation?.kelly_exposure || primaryAllocation?.executive_exposure || '—'}
+                    </div>
+                    <div className="mono mt-0.5 text-[10px] text-slate-500">cap 10% bankroll</div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-700/35 bg-slate-950/35 px-4 py-3">
+                    <div className="mono text-[10px] uppercase tracking-[0.2em] text-slate-500">Portfolio Governed</div>
+                    <div className="mt-1 text-xl font-semibold text-slate-300">{primaryAllocation?.executive_exposure || '0.00u'}</div>
+                    <div className="mono mt-0.5 text-[10px] text-slate-500">{executive.aggression_state || 'n/a'}</div>
                   </div>
                   <div className="rounded-2xl border border-emerald-300/20 bg-slate-950/35 px-4 py-3">
                     <div className="mono text-[10px] uppercase tracking-[0.2em] text-slate-500">{t('decision.conviction')}</div>
                     <div className="mt-1 text-xl font-semibold text-white">{tierLabel(primaryAllocation?.conviction_tier, t)}</div>
-                  </div>
-                  <div className="rounded-2xl border border-emerald-300/20 bg-slate-950/35 px-4 py-3">
-                    <div className="mono text-[10px] uppercase tracking-[0.2em] text-slate-500">{t('decision.slatePosture')}</div>
-                    <div className="mt-1 text-xl font-semibold text-white">{executive.aggression_state || portfolioSummary.recommended_aggression || 'n/a'}</div>
                   </div>
                 </div>
                 <div className="mt-4 rounded-2xl border border-emerald-300/20 bg-slate-950/35 px-4 py-3 text-sm text-slate-200">
@@ -623,7 +626,7 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <div className="truncate text-sm font-semibold text-white">{row.team}</div>
-                            <div className="mt-1 text-xs text-slate-400">{row.executive_exposure || '0.00u'} / {tierLabel(row.conviction_tier, t)}</div>
+                            <div className="mt-1 text-xs text-slate-400">{row.kelly_exposure || row.executive_exposure || '—'} · {tierLabel(row.conviction_tier, t)}</div>
                           </div>
                           <SignalPill tone={actionTone(row.action)}>{actionLabel(row.action, t)}</SignalPill>
                         </div>
