@@ -1612,20 +1612,29 @@ function buildPerformanceDashboard(date = loadCoreState().date, learningObservab
   const veSeason = computeWindowStats(veRows, null);
   const ve30d   = computeWindowStats(veRows, 30);
   const ve7d    = computeWindowStats(veRows, 7);
-  const veToday = computeWindowStats(veRows.filter(r => r.date === date), null);
   const naSeason = computeWindowStats(naRows, null);
 
   // Run Q-Kelly cap 10% backtest per window to get ROI consistent with backtest analysis
   const cutoff7d  = new Date(Date.now() - 7  * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const cutoff30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const veComplete = veRows.filter(r => r.win_loss !== null);
+  // Find the most recent date with complete Validated Edge results
+  const lastCompletedDate = veComplete.length
+    ? veComplete.reduce((max, r) => r.date > max ? r.date : max, veComplete[0].date)
+    : null;
+  const veYesterday = lastCompletedDate
+    ? computeWindowStats(veRows.filter(r => r.date === lastCompletedDate), null)
+    : { sample_size: 0, complete: 0, pending: 0, wins: 0, losses: 0, accuracy: null };
+  const roiYesterday = lastCompletedDate
+    ? kellyBacktestRoi(veComplete.filter(r => r.date === lastCompletedDate))
+    : null;
 
   const roi7d    = kellyBacktestRoi(veComplete.filter(r => r.date >= cutoff7d));
   const roi30d   = kellyBacktestRoi(veComplete.filter(r => r.date >= cutoff30d));
   const roiSeason = kellyBacktestRoi(veComplete);
 
   const performanceWindows = [
-    { key: 'today',  label: 'Today',  span: '1D',  ...veToday,  roi_pct: null, note: 'Current session signals.' },
+    { key: 'today',  label: 'Last Session', span: '1D', ...veYesterday, roi_pct: roiYesterday, note: lastCompletedDate ? `Most recent completed session: ${lastCompletedDate}.` : 'No completed sessions yet.' },
     { key: '7d',     label: '7D',     span: '7D',  ...ve7d,     roi_pct: roi7d,    note: 'Q-Kelly cap 10% backtested on 7d Validated Edge signals.' },
     { key: '30d',    label: '30D',    span: '30D', ...ve30d,    roi_pct: roi30d,   note: 'Q-Kelly cap 10% backtested on 30d Validated Edge signals.' },
     { key: 'season', label: 'Season', span: 'SZN', ...veSeason, roi_pct: roiSeason, note: 'Q-Kelly cap 10% backtested — full Validated Edge historical sample.' },
