@@ -15,6 +15,7 @@ import ResearchWorkspace from '../workspaces/research/ResearchWorkspace';
 import DecisionPanelWorkspace from '../workspaces/decision-panel/DecisionPanelWorkspace';
 import HomeWorkspace from '../workspaces/home/HomeWorkspace';
 import ResponsibleUseWorkspace from '../workspaces/responsible-use/ResponsibleUseWorkspace';
+import AnalyticsWorkspace from '../workspaces/analytics/AnalyticsWorkspace';
 import { fmt, timeAgo } from '../shared/lib/formatters';
 import { useLanguage } from '../shared/i18n/LanguageProvider';
 
@@ -36,6 +37,8 @@ function WorkspaceRenderer({ workspaceId, overview, detail, onSelectGame, onChan
       return <OpsHealthWorkspace overview={overview} status={status} />;
     case 'responsible-use':
       return <ResponsibleUseWorkspace />;
+    case 'analytics':
+      return <AnalyticsWorkspace />;
     default:
       return <DecisionPanelWorkspace overview={overview} status={status} active />;
   }

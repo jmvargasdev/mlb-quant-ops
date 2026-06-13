@@ -35,12 +35,17 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.2.4",
     "@vitejs/plugin-react": "^6.0.1",
+    "better-sqlite3": "^12.10.0",
     "express": "^5.2.1",
+    "geoip-lite": "^2.0.2",
     "playwright": "^1.59.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "recharts": "^3.8.1",
     "tailwindcss": "^4.2.4",
     "vite": "^8.0.11"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
   }
 }

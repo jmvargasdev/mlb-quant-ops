@@ -2,6 +2,8 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const portalRoutes = require('../api/portal-routes');
+const analyticsRoutes = require('../api/analytics-routes');
+const { createAnalyticsMiddleware } = require('./analytics-middleware');
 const { getRuntimeConfig, validateRuntimeConfig } = require('../config');
 const { startBootstrapScheduler } = require('./bootstrap-scheduler');
 const { startIntradayScheduler } = require('./intraday-scheduler');
@@ -53,7 +55,9 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use(createAnalyticsMiddleware(config.storage.sqlitePath));
 app.use('/api/portal', portalRoutes);
+app.use('/api/analytics', analyticsRoutes);
 app.use('/screenshots', express.static(path.join(config.storage.artifactsPath, 'screenshots')));
 
 app.get('/health', (req, res) => {

@@ -55,6 +55,13 @@ export const WORKSPACE_DEFINITIONS = [
     questionKey: 'workspace.responsible.question',
     descriptionKey: 'workspace.responsible.description',
   },
+  {
+    id: 'analytics',
+    labelKey: 'workspace.analytics.label',
+    shortLabelKey: 'workspace.analytics.short',
+    questionKey: 'workspace.analytics.question',
+    descriptionKey: 'workspace.analytics.description',
+  },
 ];
 
 export const WORKSPACES = WORKSPACE_DEFINITIONS.map((workspace) => ({
