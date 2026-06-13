@@ -1018,16 +1018,26 @@ function determineConvictionTier(card, research, conviction) {
   return 'Speculative';
 }
 
-function exposureForTier(tier) {
-  return {
-    'Elite Conviction': '1.0u',
-    'High Conviction': '0.5u',
-    Supportive: '0.25u',
-    Speculative: '0.10u',
-    Watchlist: 'Pass',
-    Unstable: 'Pass',
-    Decaying: 'Pass',
-  }[tier] || 'Pass';
+function kellyExposure(tier, fairProbability, marketProbability) {
+  const p = typeof fairProbability === 'number' && fairProbability > 0 && fairProbability < 1 ? fairProbability : null;
+  const mktProb = typeof marketProbability === 'number' && marketProbability > 0 && marketProbability < 1 ? marketProbability : null;
+
+  // No edge signal without valid probabilities
+  if (!p || !mktProb) return 'Pass';
+
+  // Only size when model sees positive edge over market
+  if (p <= mktProb) return 'Pass';
+
+  const decimalOdds = 1 / mktProb;
+  const b = decimalOdds - 1;
+  const q = 1 - p;
+  const fullKelly = (p * b - q) / b;
+  const quarterKelly = fullKelly * 0.25;
+  const capped = Math.min(Math.max(quarterKelly, 0), 0.05); // cap at 5% of bankroll
+
+  // Express as units rounded to nearest 0.05u
+  const units = Math.round(capped * 20) / 20;
+  return units > 0 ? `${units.toFixed(2)}u` : 'Pass';
 }
 
 function decisionTone(tier) {
@@ -1687,7 +1697,9 @@ function buildDecisionPanel() {
       timing_quality_score: row.research?.timing_quality_score ?? null,
       operational_conviction: round(row.conviction, 2),
       conviction_tier: convictionTier,
-      exposure: exposureForTier(convictionTier),
+      fair_probability: row.card.fair_probability ?? null,
+      market_probability: row.card.market_probability ?? null,
+      exposure: kellyExposure(convictionTier, row.card.fair_probability, row.card.market_probability),
       tone: decisionTone(convictionTier),
       volatility_score: row.card.volatility_score,
       risk_flags: row.card.risk_flags || [],
