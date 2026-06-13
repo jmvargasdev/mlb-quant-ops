@@ -607,8 +607,10 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
                     <div className="mono mt-0.5 text-[10px] text-slate-500">{executive.aggression_state || 'n/a'}</div>
                   </div>
                   <div className="rounded-2xl border border-emerald-300/20 bg-slate-950/35 px-4 py-3">
-                    <div className="mono text-[10px] uppercase tracking-[0.2em] text-slate-500">{t('decision.conviction')}</div>
-                    <div className="mt-1 text-xl font-semibold text-white">{tierLabel(primaryAllocation?.conviction_tier, t)}</div>
+                    <div className="mono text-[10px] uppercase tracking-[0.2em] text-slate-500">Signal</div>
+                    <div className="mt-1 text-xl font-semibold text-white">
+                      {primaryAllocation ? actionLabel(primaryAllocation.action, t) : 'n/a'}
+                    </div>
                   </div>
                 </div>
                 <div className="mt-4 rounded-2xl border border-emerald-300/20 bg-slate-950/35 px-4 py-3 text-sm text-slate-200">
