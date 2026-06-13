@@ -1,5 +1,6 @@
 import CompactStatGrid from '../../shared/components/CompactStatGrid';
 import MetricTile from '../../components/MetricTile';
+import ModelAnalysisAccordion from './ModelAnalysisAccordion';
 import PanelFrame from '../../shared/components/PanelFrame';
 import SignalPill from '../../shared/components/SignalPill';
 import { useState } from 'react';
@@ -290,6 +291,8 @@ export default function HomeWorkspace({ overview, status, onNavigate }) {
           ))}
         </div>
       </PanelFrame>
+
+      <ModelAnalysisAccordion />
     </div>
   );
 }

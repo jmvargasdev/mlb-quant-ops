@@ -2,6 +2,7 @@ const express = require('express');
 const {
   buildDecisionPanel,
   buildDecisionLedgerStatus,
+  buildModelAnalysis,
   buildOverview,
   buildQuantReportMarkdown,
   buildResearchWorkspace,
@@ -31,6 +32,10 @@ router.get('/games/:gameId', (req, res) => {
     return;
   }
   res.json(payload);
+});
+
+router.get('/model-analysis', (req, res) => {
+  res.json(buildModelAnalysis());
 });
 
 router.get('/research', (req, res) => {

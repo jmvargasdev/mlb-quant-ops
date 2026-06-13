@@ -2580,10 +2580,146 @@ function rawArtifact(name) {
   return readJson(target);
 }
 
+function getHistoricalOdds(date, gameId, side) {
+  try {
+    const histDir = path.join(ROOT, 'mlb_ops', 'historical');
+    const files = fs.readdirSync(histDir)
+      .filter(f => f.startsWith(`${date}_matchups`) && f.endsWith('.json'))
+      .sort();
+    if (!files.length) return null;
+    const data = JSON.parse(fs.readFileSync(path.join(histDir, files[files.length - 1]), 'utf8'));
+    const games = data.games || data;
+    const game = games.find(g => Number(g.game_id) === Number(gameId));
+    const ml = game?.market?.moneyline?.current;
+    if (!ml) return null;
+    return side === 'away' ? ml.away_decimal : ml.home_decimal;
+  } catch { return null; }
+}
+
+function buildModelAnalysis() {
+  const allRows = loadHistoricalOutcomeRows();
+  const VALIDATED = r => r.action === 'Wait for Confirmation' || r.conviction_tier === 'Supportive';
+  const veRows = allRows.filter(VALIDATED);
+  const signals = veRows
+    .filter(r => r.win_loss !== null)
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.snapshot_label || '').localeCompare(b.snapshot_label || ''));
+
+  const CAPS = { flat: null, cap5: 0.05, cap10: 0.10, cap15: 0.15, nocap: Infinity };
+  const banks = {}, peaks = {}, maxDD = {}, evTotal = {}, logGrowth = {}, totalStaked = {}, totalPL = {};
+  for (const m of Object.keys(CAPS)) {
+    banks[m] = 100; peaks[m] = 100; maxDD[m] = 0;
+    evTotal[m] = 0; logGrowth[m] = 0; totalStaked[m] = 0; totalPL[m] = 0;
+  }
+
+  const results = [];
+  const evolution = [];
+
+  for (let i = 0; i < signals.length; i++) {
+    const r = signals[i];
+    const won = r.win_loss === 'win';
+    const dec = getHistoricalOdds(r.date, r.game_id, r.side) || 1.91;
+    const b = dec - 1;
+    const prev = results.slice(-20);
+    const p = prev.length >= 5 ? prev.filter(x => x.won).length / prev.length : 0.715;
+    const q = 1 - p;
+    const qk = Math.max(0, (p * b - q) / b) * 0.25;
+
+    for (const [m, cap] of Object.entries(CAPS)) {
+      let f;
+      if (m === 'flat') f = 0.02;
+      else if (cap === Infinity) f = qk;
+      else f = Math.min(qk, cap);
+
+      const stake = banks[m] * f;
+      const pl = won ? stake * b : -stake;
+      banks[m] += pl;
+      if (banks[m] > peaks[m]) peaks[m] = banks[m];
+      const dd = (peaks[m] - banks[m]) / peaks[m] * 100;
+      if (dd > maxDD[m]) maxDD[m] = dd;
+      evTotal[m] += p * stake * b - q * stake;
+      logGrowth[m] += won ? Math.log(1 + f * b) : Math.log(1 - f);
+      totalStaked[m] += stake;
+      totalPL[m] += pl;
+    }
+
+    results.push({ won });
+    if (i % 10 === 0 || i === signals.length - 1) {
+      evolution.push({
+        signal: i + 1,
+        date: r.date,
+        flat: round(banks.flat, 1),
+        cap5: round(banks.cap5, 1),
+        cap10: round(banks.cap10, 1),
+        cap15: round(banks.cap15, 1),
+        nocap: round(banks.nocap, 1),
+      });
+    }
+  }
+
+  const n = signals.length;
+  const wins = results.filter(r => r.won).length;
+  const accuracy = n ? round((wins / n) * 100, 1) : null;
+
+  const methods = [
+    { key: 'flat',  label: '2% Flat',        cap_pct: 2  },
+    { key: 'cap5',  label: 'Q-Kelly cap 5%',  cap_pct: 5  },
+    { key: 'cap10', label: 'Q-Kelly cap 10%', cap_pct: 10 },
+    { key: 'cap15', label: 'Q-Kelly cap 15%', cap_pct: 15 },
+    { key: 'nocap', label: 'Q-Kelly sin cap', cap_pct: null },
+  ].map(({ key, label, cap_pct }) => ({
+    key,
+    label,
+    cap_pct,
+    bankroll_final: round(banks[key], 1),
+    roi_pct: round((banks[key] - 100), 1),
+    roi_multiple: round(banks[key] / 100, 2),
+    max_drawdown_pct: round(maxDD[key], 1),
+    ev_total: round(evTotal[key], 1),
+    ev_per_signal: round(evTotal[key] / n, 2),
+    ev_per_unit_staked_pct: round((totalPL[key] / totalStaked[key]) * 100, 1),
+    geo_growth_per_signal_pct: round((Math.exp(logGrowth[key] / n) - 1) * 100, 3),
+  }));
+
+  // Kelly fraction distribution
+  const kellyDist = { '0-5': 0, '5-10': 0, '10-15': 0, '15-20': 0, '20+': 0 };
+  const tmpResults = [];
+  for (const r of signals) {
+    const dec = getHistoricalOdds(r.date, r.game_id, r.side) || 1.91;
+    const b = dec - 1;
+    const prev = tmpResults.slice(-20);
+    const p = prev.length >= 5 ? prev.filter(x => x.won).length / prev.length : 0.715;
+    const q = 1 - p;
+    const qkPct = Math.max(0, (p * b - q) / b) * 0.25 * 100;
+    if (qkPct < 5) kellyDist['0-5']++;
+    else if (qkPct < 10) kellyDist['5-10']++;
+    else if (qkPct < 15) kellyDist['10-15']++;
+    else if (qkPct < 20) kellyDist['15-20']++;
+    else kellyDist['20+']++;
+    tmpResults.push({ won: r.win_loss === 'win' });
+  }
+
+  return {
+    generated_at: new Date().toISOString(),
+    signal_universe: 'Validated Edge (Wait for Confirmation + Supportive)',
+    total_signals: n,
+    wins,
+    losses: n - wins,
+    accuracy_pct: accuracy,
+    methods,
+    kelly_distribution: Object.entries(kellyDist).map(([range, count]) => ({
+      range: range + '%',
+      count,
+      pct: round((count / n) * 100, 1),
+    })),
+    evolution,
+  };
+}
+
 module.exports = {
   buildDecisionPanel,
   buildDecisionLedgerStatus,
   buildLearningObservability,
+  buildModelAnalysis,
   buildOverview,
   buildResearchWorkspace,
   buildQuantReportMarkdown,
