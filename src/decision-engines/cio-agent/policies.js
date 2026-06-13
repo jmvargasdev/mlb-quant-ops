@@ -1,3 +1,5 @@
+// Ontology v2 — EXPERIMENTAL since 2026-06-13, review 2026-08-15
+// See docs/architecture/adr-001-validated-edge-ontology.md
 const ACTIONS = {
   VALIDATED_EDGE: 'Validated Edge',
   WATCHLIST: 'Watchlist',

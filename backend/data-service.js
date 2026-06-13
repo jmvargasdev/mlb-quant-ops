@@ -1018,6 +1018,7 @@ function determineConvictionTier(card, research, conviction) {
   return 'Speculative';
 }
 
+// Sizing v2 — Q-Kelly cap 10% per ADR-001 (EXPERIMENTAL since 2026-06-13)
 function kellyExposure(tier, fairProbability, marketProbability) {
   const p = typeof fairProbability === 'number' && fairProbability > 0 && fairProbability < 1 ? fairProbability : null;
   const mktProb = typeof marketProbability === 'number' && marketProbability > 0 && marketProbability < 1 ? marketProbability : null;
