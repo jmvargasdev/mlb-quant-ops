@@ -597,7 +597,7 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
                   <div className="rounded-2xl border border-emerald-300/30 bg-emerald-300/8 px-4 py-3">
                     <div className="mono text-[10px] uppercase tracking-[0.2em] text-emerald-400">Q-Kelly Size</div>
                     <div className="mt-1 text-xl font-semibold text-white">
-                      {primaryAllocation?.kelly_exposure || primaryAllocation?.executive_exposure || '—'}
+                      {primaryAllocation?.raw_exposure || '—'}
                     </div>
                     <div className="mono mt-0.5 text-[10px] text-slate-500">cap 10% bankroll</div>
                   </div>
@@ -626,7 +626,7 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <div className="truncate text-sm font-semibold text-white">{row.team}</div>
-                            <div className="mt-1 text-xs text-slate-400">{row.kelly_exposure || row.executive_exposure || '—'} · {tierLabel(row.conviction_tier, t)}</div>
+                            <div className="mt-1 text-xs text-slate-400">{row.raw_exposure || row.executive_exposure || '—'} · {tierLabel(row.conviction_tier, t)}</div>
                           </div>
                           <SignalPill tone={actionTone(row.action)}>{actionLabel(row.action, t)}</SignalPill>
                         </div>
