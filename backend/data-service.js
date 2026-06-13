@@ -1522,105 +1522,105 @@ function summarizeOutcomeRows(rows) {
   };
 }
 
-function buildPerformanceDashboard(date = loadCoreState().date, learningObservability = null) {
-  const outcomeAttribution = readJsonIfExists(path.join(PROCESSED_DIR, 'outcome_attribution.json'));
-  const policyFeedback = readJsonIfExists(path.join(PROCESSED_DIR, 'policy_feedback.json'));
-  const learning = learningObservability || buildLearningObservability(date, {});
-  const outcomeRows = outcomeAttribution?.rows || [];
-  const feedbackSummary = policyFeedback?.summary || null;
-
-  const overall = feedbackSummary
-    ? {
-        decisions: feedbackSummary.decisions || 0,
-        complete: feedbackSummary.complete || 0,
-        pending: feedbackSummary.pending || 0,
-        correct: feedbackSummary.correct || 0,
-        incorrect: feedbackSummary.incorrect || 0,
-        accuracy: feedbackSummary.accuracy ?? null,
-        profit_loss_proxy: Number(feedbackSummary.profit_loss_proxy || 0),
-        estimated_roi_pct: round(Number(feedbackSummary.profit_loss_proxy || 0) * 2, 2),
-      }
-    : summarizeOutcomeRows(outcomeRows);
-
-  const primaryRow = policyFeedback?.by_action?.find((row) => row.action === 'Execute Now') || null;
-  const primaryFallback = outcomeRows.length
-    ? summarizeOutcomeRows(outcomeRows.filter((row) => row.action === 'Execute Now'))
-    : null;
-  const highRows = [
-    ...(policyFeedback?.by_conviction_tier || []).filter((row) => ['Elite Conviction', 'High Conviction'].includes(row.conviction_tier)),
-  ];
-  const highFallbackRows = outcomeRows.filter((row) => ['Elite Conviction', 'High Conviction'].includes(row.conviction_tier));
-  const highConviction = highRows.length
-    ? highRows.reduce((acc, row) => {
-        acc.decisions += row.decisions || 0;
-        acc.complete += row.complete || 0;
-        acc.pending += row.pending || 0;
-        acc.correct += row.correct || 0;
-        acc.incorrect += row.incorrect || 0;
-        acc.profit_loss_proxy += Number(row.profit_loss_proxy || 0);
-        return acc;
-      }, {
-        decisions: 0,
-        complete: 0,
-        pending: 0,
-        correct: 0,
-        incorrect: 0,
-        profit_loss_proxy: 0,
-      })
-    : highFallbackRows.length
-      ? summarizeOutcomeRows(highFallbackRows)
-      : null;
-
-  if (highConviction) {
-    highConviction.accuracy = highConviction.complete ? round((highConviction.correct / highConviction.complete) * 100, 2) : null;
-    highConviction.profit_loss_proxy = round(highConviction.profit_loss_proxy, 2);
-    highConviction.estimated_roi_pct = round(highConviction.profit_loss_proxy * 2, 2);
+function loadHistoricalOutcomeRows() {
+  const attrDir = path.join(ROOT, 'mlb_ops', 'historical', 'outcome_attribution');
+  if (!fs.existsSync(attrDir)) return [];
+  const rows = [];
+  for (const f of fs.readdirSync(attrDir).sort()) {
+    if (!f.endsWith('.jsonl')) continue;
+    try {
+      const lines = fs.readFileSync(path.join(attrDir, f), 'utf8').trim().split('\n');
+      for (const l of lines) { try { rows.push(JSON.parse(l)); } catch {} }
+    } catch {}
   }
+  // Deduplicate: keep latest source_signature per (date, game_id, side, snapshot_label)
+  const seen = new Map();
+  for (const r of rows) {
+    const key = `${r.date}|${r.game_id}|${r.side}|${r.snapshot_label}`;
+    if (!seen.has(key) || r.source_signature > seen.get(key).source_signature) seen.set(key, r);
+  }
+  return [...seen.values()];
+}
 
-  const primaryAllocation = primaryRow
-    ? {
-        decisions: primaryRow.decisions || 0,
-        complete: primaryRow.complete || 0,
-        pending: primaryRow.pending || 0,
-        correct: primaryRow.correct || 0,
-        incorrect: primaryRow.incorrect || 0,
-        accuracy: primaryRow.accuracy ?? null,
-        profit_loss_proxy: Number(primaryRow.profit_loss_proxy || 0),
-        estimated_roi_pct: round(Number(primaryRow.profit_loss_proxy || 0) * 2, 2),
-      }
-    : primaryFallback;
+function computeWindowStats(rows, sinceDaysAgo) {
+  const cutoff = sinceDaysAgo
+    ? new Date(Date.now() - sinceDaysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    : null;
+  const subset = cutoff ? rows.filter(r => r.date >= cutoff) : rows;
+  const complete = subset.filter(r => r.win_loss !== null);
+  const wins = complete.filter(r => r.win_loss === 'win').length;
+  const pl = complete.reduce((s, r) => s + (r.profit_loss_proxy || 0), 0);
+  return {
+    sample_size: complete.length,
+    complete: complete.length,
+    pending: subset.filter(r => r.win_loss === null).length,
+    wins,
+    losses: complete.length - wins,
+    accuracy: complete.length ? round((wins / complete.length) * 100, 1) : null,
+    profit_loss_proxy: round(pl, 2),
+  };
+}
 
-  const sampleSize = overall.decisions || 0;
-  const completeOutcomes = overall.complete || 0;
-  const pendingOutcomes = overall.pending || 0;
-  const status = completeOutcomes > 0
-    ? 'tracking_results'
-    : sampleSize > 0
-      ? 'collecting_evidence'
-      : 'not_started';
+function buildPerformanceDashboard(date = loadCoreState().date, learningObservability = null) {
+  const learning = learningObservability || buildLearningObservability(date, {});
+  const allRows = loadHistoricalOutcomeRows();
+
+  const VALIDATED_EDGE = r =>
+    r.action === 'Wait for Confirmation' || r.conviction_tier === 'Supportive';
+  const NO_ACTION = r =>
+    ['Execute Now', 'Reduced Quality'].includes(r.action) ||
+    ['Elite Conviction', 'High Conviction', 'Unstable', 'Decaying'].includes(r.conviction_tier);
+
+  const veRows = allRows.filter(VALIDATED_EDGE);
+  const naRows = allRows.filter(NO_ACTION);
+
+  const veSeason = computeWindowStats(veRows, null);
+  const ve30d   = computeWindowStats(veRows, 30);
+  const ve7d    = computeWindowStats(veRows, 7);
+  const veToday = computeWindowStats(veRows.filter(r => r.date === date), null);
+  const naSeason = computeWindowStats(naRows, null);
+
+  const performanceWindows = [
+    { key: 'today',  label: 'Today',  span: '1D',  ...veToday,  note: 'Current session signals.' },
+    { key: '7d',     label: '7D',     span: '7D',  ...ve7d,     note: 'Short rolling context.' },
+    { key: '30d',    label: '30D',    span: '30D', ...ve30d,    note: 'Current operating window.' },
+    { key: 'season', label: 'Season', span: 'SZN', ...veSeason, note: 'Full data sample.' },
+  ];
+
+  const status = veSeason.complete > 0 ? 'tracking_results'
+    : allRows.length > 0 ? 'collecting_evidence'
+    : 'not_started';
 
   return {
     date,
     generated_at: new Date().toISOString(),
     unit_assumption_pct: 2,
     status,
-    source: {
-      outcome_attribution: outcomeAttribution ? 'available' : 'missing',
-      policy_feedback: policyFeedback ? 'available' : 'missing',
+    source: 'live',
+    overall: veSeason,
+    primary_allocation: {
+      label: 'Validated Edge',
+      accuracy: veSeason.accuracy,
+      decisions: veSeason.sample_size,
+      complete: veSeason.complete,
+      pending: veSeason.pending,
+      profit_loss_proxy: veSeason.profit_loss_proxy,
+      estimated_roi_pct: round(veSeason.profit_loss_proxy * 2, 2),
     },
-    overall,
-    primary_allocation: primaryAllocation ? {
-      label: 'Execute Now',
-      ...primaryAllocation,
-    } : null,
-    high_conviction: highConviction ? {
-      label: 'Elite + High Conviction',
-      ...highConviction,
-    } : null,
-    sample_size: sampleSize,
-    complete_outcomes: completeOutcomes,
-    pending_outcomes: pendingOutcomes,
-    realized_roi_pct: overall.estimated_roi_pct,
+    high_conviction: {
+      label: 'No Action',
+      accuracy: naSeason.accuracy,
+      decisions: naSeason.sample_size,
+      complete: naSeason.complete,
+      pending: naSeason.pending,
+      profit_loss_proxy: naSeason.profit_loss_proxy,
+      estimated_roi_pct: round(naSeason.profit_loss_proxy * 2, 2),
+    },
+    performance_windows: performanceWindows,
+    sample_size: veSeason.sample_size,
+    complete_outcomes: veSeason.complete,
+    pending_outcomes: veSeason.pending,
+    realized_roi_pct: round(veSeason.profit_loss_proxy * 2, 2),
     trust: {
       ledger_coverage: learning.decision_ledger.coverage,
       contract_validation: learning.contract_validation.status,
@@ -2429,6 +2429,7 @@ function buildOverview() {
       quant_score: card.quant_score,
       persistence_score: card.persistence_score,
     })),
+    performance_dashboard: buildPerformanceDashboard(state.date),
   };
 }
 

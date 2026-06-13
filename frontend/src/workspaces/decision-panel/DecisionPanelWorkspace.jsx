@@ -9,10 +9,9 @@ import { useLanguage } from '../../shared/i18n/LanguageProvider';
 import { useDecisionPanel } from './useDecisionPanel';
 
 function actionTone(action) {
-  if (action === 'Execute Now') return 'positive';
-  if (action === 'Wait for Confirmation') return 'warning';
-  if (action === 'Reduced Quality') return 'info';
-  if (action === 'Pass') return 'danger';
+  if (action === 'Wait for Confirmation') return 'positive';
+  if (action === 'Execute Now' || action === 'Reduced Quality') return 'danger';
+  if (action === 'Pass') return 'neutral';
   return 'neutral';
 }
 
@@ -24,9 +23,8 @@ function riskTone(value) {
 }
 
 function tierTone(tier) {
-  if (tier === 'Elite Conviction' || tier === 'High Conviction') return 'positive';
-  if (tier === 'Supportive') return 'info';
-  if (tier === 'Speculative' || tier === 'Watchlist') return 'warning';
+  if (tier === 'Supportive') return 'positive';
+  if (tier === 'Watchlist' || tier === 'Speculative') return 'warning';
   return 'danger';
 }
 
@@ -43,20 +41,15 @@ function exposureUnits(value) {
 }
 
 function actionPriority(action) {
-  if (action === 'Execute Now') return 4;
-  if (action === 'Wait for Confirmation') return 3;
-  if (action === 'Reduced Quality') return 2;
-  if (action === 'Pass') return 0;
-  return 1;
+  if (action === 'Wait for Confirmation') return 4;
+  if (action === 'Pass') return 1;
+  return 0; // Execute Now, Reduced Quality → lowest
 }
 
 function tierPriority(tier) {
-  if (tier === 'Elite Conviction') return 5;
-  if (tier === 'High Conviction') return 4;
-  if (tier === 'Supportive') return 3;
-  if (tier === 'Speculative') return 2;
-  if (tier === 'Watchlist') return 1;
-  return 0;
+  if (tier === 'Supportive') return 4;
+  if (tier === 'Watchlist' || tier === 'Speculative') return 2;
+  return 0; // Elite Conviction, High Conviction, Unstable, Decaying → no action
 }
 
 function actionLabel(action, t) {
