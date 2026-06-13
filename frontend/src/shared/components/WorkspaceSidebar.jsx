@@ -14,7 +14,7 @@ export default function WorkspaceSidebar({ activeWorkspace, onChange, overview, 
   const processUpdatedAt = latestSnapshotAt || overview?.meta?.generated_at || scheduleTiming.process_updated_at || null;
 
   return (
-    <aside className="panel panel-strong rounded-3xl p-4 lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:overflow-hidden">
+    <aside className="panel panel-strong scrollbar-thin rounded-3xl p-4 lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:overflow-y-auto">
       <div className="border-b border-slate-700/40 pb-4">
         <div className="text-2xl font-semibold tracking-tight text-white">MarketSentinel</div>
         <div className="mt-1 text-sm font-medium text-slate-300">MLB Quant Ops</div>

@@ -14,6 +14,13 @@ export const WORKSPACE_DEFINITIONS = [
     descriptionKey: 'workspace.decision.description',
   },
   {
+    id: 'historical-selections',
+    labelKey: 'workspace.historicalSelections.label',
+    shortLabelKey: 'workspace.historicalSelections.short',
+    questionKey: 'workspace.historicalSelections.question',
+    descriptionKey: 'workspace.historicalSelections.description',
+  },
+  {
     id: 'daily-ops',
     labelKey: 'workspace.daily.label',
     shortLabelKey: 'workspace.daily.short',

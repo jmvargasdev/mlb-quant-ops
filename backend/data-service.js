@@ -1377,6 +1377,7 @@ function buildDecisionLedgerRows({
   const evidenceByKey = new Map((structures || []).map((row) => [`${row.game_id}:${row.side}`, row]));
   return (executiveAllocation?.allocation_rows || []).map((row) => {
     const evidence = evidenceByKey.get(`${row.game_id}:${row.side}`) || {};
+    const combined = { ...evidence, ...row };
     return {
       date,
       snapshot_label: snapshotLabel || null,
@@ -1385,15 +1386,24 @@ function buildDecisionLedgerRows({
       team: row.team,
       side: row.side,
       action: row.action,
+      signal_classification: signalClassification(combined),
+      exposure_governance: exposureGovernance(row),
       executive_exposure: row.executive_exposure,
       kelly_exposure: evidence.exposure || null,
       raw_exposure: row.raw_exposure,
       conviction_tier: row.conviction_tier,
       reason: row.reason,
       reason_codes: evidence.reason_codes || [],
+      fair_probability: evidence.fair_probability ?? null,
+      market_probability: evidence.market_probability ?? null,
+      edge_pct_points: evidence.edge_pct_points ?? null,
+      quant_score: evidence.quant_score ?? null,
       timing_quality_score: row.timing_quality_score ?? evidence.timing_quality_score ?? null,
       persistence_score: evidence.persistence_score ?? null,
       volatility_score: evidence.volatility_score ?? null,
+      validation_bucket: evidence.validation_bucket ?? null,
+      lifecycle: evidence.lifecycle ?? null,
+      policy_gates: row.policy_gates || [],
       operational_conviction: row.operational_conviction ?? evidence.operational_conviction ?? null,
       market_regime: posture?.marketRegime || null,
       portfolio_risk: portfolioSummary?.portfolio_risk || null,
@@ -1573,6 +1583,146 @@ function computeWindowStats(rows, sinceDaysAgo) {
   };
 }
 
+function hasPositiveKellyEdge(row) {
+  const fair = Number(row?.fair_probability);
+  const market = Number(row?.market_probability);
+  if (!Number.isFinite(fair) || !Number.isFinite(market)) return exposureUnits(row?.raw_exposure || row?.kelly_exposure || row?.exposure) > 0;
+  return fair > market;
+}
+
+function hasBlockingSignalPolicy(row) {
+  const gates = row?.policy_gates || row?.governance_policy_gates || [];
+  return gates.some((gate) => (
+    gate?.status === 'active' &&
+    ['NO_EDGE', 'EDGE_COLLAPSED'].includes(gate.code)
+  ));
+}
+
+function isValidatedEdgeSignal(row) {
+  if (!row) return false;
+  if (row.signal_classification === 'Validated Edge') return true;
+  if (row.action === 'Validated Edge' || row.action === 'Wait for Confirmation') return true;
+  if (row.conviction_tier === 'Supportive') return true;
+  if (row.action === 'Watchlist' && hasPositiveKellyEdge(row) && !hasBlockingSignalPolicy(row)) return true;
+  return false;
+}
+
+function signalClassification(row) {
+  if (isValidatedEdgeSignal(row)) return 'Validated Edge';
+  if (row?.action === 'Pass' || hasBlockingSignalPolicy(row)) return 'Pass';
+  if (row?.action === 'Watchlist' || row?.conviction_tier === 'Watchlist') return 'Watchlist';
+  return row?.action || 'Unclassified';
+}
+
+function exposureGovernance(row) {
+  if (row?.action === 'Validated Edge') return 'active';
+  if (row?.action === 'Watchlist') return 'monitor_only';
+  if (row?.action === 'Pass') return 'none';
+  return row?.executive_exposure ? 'legacy' : 'none';
+}
+
+function candidateSignalCards(sections = {}) {
+  const byKey = new Map();
+  const candidates = [
+    ...(sections.top_bettable || []),
+    ...(sections.watchlist || []),
+  ];
+  for (const card of candidates) {
+    if (card.category === 'top_bettable' || hasPositiveKellyEdge(card)) {
+      byKey.set(`${card.game_id}:${card.selection_side}`, card);
+    }
+  }
+  return [...byKey.values()];
+}
+
+function selectionResultLabel(row) {
+  if (row?.win_loss === 'win') return 'Win';
+  if (row?.win_loss === 'loss') return 'Loss';
+  if (row?.win_loss === 'push') return 'Push';
+  if (row?.result_status === 'pending') return 'Pending';
+  return 'Missing';
+}
+
+function selectionScoreLabel(row) {
+  const result = row?.game_result || {};
+  if (!result.final || result.away_score === null || result.away_score === undefined) return null;
+  return `${result.away_team} ${result.away_score}-${result.home_score} ${result.home_team}`;
+}
+
+function buildHistoricalSelections() {
+  const rows = loadHistoricalOutcomeRows()
+    .map((row) => ({
+      id: [
+        row.date,
+        row.snapshot_label || 'unknown',
+        row.source_signature || 'unknown',
+        row.game_id,
+        row.side,
+      ].join(':'),
+      date: row.date,
+      generated_at: row.generated_at || null,
+      decision_generated_at: row.decision_generated_at || null,
+      snapshot_label: row.snapshot_label || null,
+      game_id: row.game_id,
+      team: row.team,
+      side: row.side,
+      matchup: row.game_result?.away_team && row.game_result?.home_team
+        ? `${row.game_result.away_team} @ ${row.game_result.home_team}`
+        : null,
+      action: row.action,
+      signal_classification: signalClassification(row),
+      exposure_governance: row.exposure_governance || exposureGovernance(row),
+      executive_exposure: row.executive_exposure || null,
+      kelly_exposure: row.kelly_exposure || null,
+      raw_exposure: row.raw_exposure || null,
+      conviction_tier: row.conviction_tier || null,
+      fair_probability: row.fair_probability ?? null,
+      market_probability: row.market_probability ?? null,
+      edge_pct_points: row.edge_pct_points ?? null,
+      quant_score: row.quant_score ?? null,
+      timing_quality_score: row.timing_quality_score ?? null,
+      persistence_score: row.persistence_score ?? null,
+      volatility_score: row.volatility_score ?? null,
+      validation_bucket: row.validation_bucket || null,
+      lifecycle: row.lifecycle || null,
+      result_status: row.result_status || null,
+      result: selectionResultLabel(row),
+      win_loss: row.win_loss || null,
+      score: selectionScoreLabel(row),
+      profit_loss_proxy: row.profit_loss_proxy ?? null,
+      decision_quality: row.decision_quality || null,
+      was_action_correct: row.was_action_correct ?? null,
+      reason: row.reason || null,
+      reason_codes: row.reason_codes || [],
+      policy_gates: row.policy_gates || [],
+      source_signature: row.source_signature || null,
+    }))
+    .sort((a, b) => (
+      String(b.date).localeCompare(String(a.date)) ||
+      String(b.decision_generated_at || b.generated_at || '').localeCompare(String(a.decision_generated_at || a.generated_at || '')) ||
+      String(a.team || '').localeCompare(String(b.team || ''))
+    ));
+
+  const validated = rows.filter(isValidatedEdgeSignal);
+  const complete = validated.filter((row) => row.win_loss !== null);
+  const wins = complete.filter((row) => row.win_loss === 'win').length;
+  const losses = complete.filter((row) => row.win_loss === 'loss').length;
+
+  return {
+    generated_at: new Date().toISOString(),
+    rows,
+    summary: {
+      total_rows: rows.length,
+      validated_edge_rows: validated.length,
+      complete_validated_edge_rows: complete.length,
+      pending_validated_edge_rows: validated.length - complete.length,
+      validated_edge_accuracy: complete.length ? round((wins / complete.length) * 100, 1) : null,
+      wins,
+      losses,
+    },
+  };
+}
+
 function kellyBacktestRoi(signals, capFraction = 0.10) {
   if (!signals || signals.length === 0) return null;
   const sorted = [...signals].sort((a, b) => a.date.localeCompare(b.date));
@@ -1598,15 +1748,14 @@ function buildPerformanceDashboard(date = loadCoreState().date, learningObservab
   const learning = learningObservability || buildLearningObservability(date, {});
   const allRows = loadHistoricalOutcomeRows();
 
-  const VALIDATED_EDGE = r =>
-    r.action === 'Validated Edge' ||
-    r.action === 'Wait for Confirmation' ||
-    r.conviction_tier === 'Supportive';
   const NO_ACTION = r =>
-    ['Execute Now', 'Reduced Quality'].includes(r.action) ||
-    ['Elite Conviction', 'High Conviction', 'Unstable', 'Decaying'].includes(r.conviction_tier);
+    !isValidatedEdgeSignal(r) &&
+    (
+      ['Execute Now', 'Reduced Quality'].includes(r.action) ||
+      ['Elite Conviction', 'High Conviction', 'Unstable', 'Decaying'].includes(r.conviction_tier)
+    );
 
-  const veRows = allRows.filter(VALIDATED_EDGE);
+  const veRows = allRows.filter(isValidatedEdgeSignal);
   const naRows = allRows.filter(NO_ACTION);
 
   const veSeason = computeWindowStats(veRows, null);
@@ -1622,19 +1771,34 @@ function buildPerformanceDashboard(date = loadCoreState().date, learningObservab
   const lastCompletedDate = veComplete.length
     ? veComplete.reduce((max, r) => r.date > max ? r.date : max, veComplete[0].date)
     : null;
+  const lastSessionRows = lastCompletedDate ? veComplete.filter(r => r.date === lastCompletedDate) : [];
   const veYesterday = lastCompletedDate
     ? computeWindowStats(veRows.filter(r => r.date === lastCompletedDate), null)
     : { sample_size: 0, complete: 0, pending: 0, wins: 0, losses: 0, accuracy: null };
   const roiYesterday = lastCompletedDate
-    ? kellyBacktestRoi(veComplete.filter(r => r.date === lastCompletedDate))
+    ? kellyBacktestRoi(lastSessionRows)
     : null;
+
+  // Build context note with selections and scores for last session
+  function buildLastSessionNote() {
+    if (!lastCompletedDate || !lastSessionRows.length) return 'No completed sessions yet.';
+    const picks = lastSessionRows.map(r => {
+      const gr = r.game_result || {};
+      const score = gr.final && gr.away_score != null
+        ? ` (${gr.away_team} ${gr.away_score}–${gr.home_score} ${gr.home_team})`
+        : '';
+      const result = r.win_loss === 'win' ? '✓' : r.win_loss === 'loss' ? '✗' : '–';
+      return `${result} ${r.team}${score}`;
+    });
+    return `${lastCompletedDate}: ${picks.join(' · ')}`;
+  }
 
   const roi7d    = kellyBacktestRoi(veComplete.filter(r => r.date >= cutoff7d));
   const roi30d   = kellyBacktestRoi(veComplete.filter(r => r.date >= cutoff30d));
   const roiSeason = kellyBacktestRoi(veComplete);
 
   const performanceWindows = [
-    { key: 'today',  label: 'Last Session', span: '1D', ...veYesterday, roi_pct: roiYesterday, note: lastCompletedDate ? `Most recent completed session: ${lastCompletedDate}.` : 'No completed sessions yet.' },
+    { key: 'today',  label: 'Last Session', span: '1D', ...veYesterday, roi_pct: roiYesterday, note: buildLastSessionNote() },
     { key: '7d',     label: '7D',     span: '7D',  ...ve7d,     roi_pct: roi7d,    note: 'Q-Kelly cap 10% backtested on 7d Validated Edge signals.' },
     { key: '30d',    label: '30D',    span: '30D', ...ve30d,    roi_pct: roi30d,   note: 'Q-Kelly cap 10% backtested on 30d Validated Edge signals.' },
     { key: 'season', label: 'Season', span: 'SZN', ...veSeason, roi_pct: roiSeason, note: 'Q-Kelly cap 10% backtested — full Validated Edge historical sample.' },
@@ -1691,12 +1855,13 @@ function buildDecisionPanel() {
   const research = buildResearchWorkspace();
   const checklist = state.checklist || {};
   const topBettable = overview.sections.top_bettable || [];
+  const signalCandidates = candidateSignalCards(overview.sections);
   const allCards = [
     ...(overview.sections.top_bettable || []),
     ...(overview.sections.watchlist || []),
     ...(overview.sections.no_action || []),
   ];
-  const memoRanked = topCardsByConviction(topBettable, research.persistence?.records || [], topBettable.length);
+  const memoRanked = topCardsByConviction(signalCandidates, research.persistence?.records || [], signalCandidates.length);
   const rankingMap = new Map((research.ranking_explainability?.rows || []).map((row) => [`${row.game_id}:${row.side}`, row]));
   const temporalGameMap = new Map((state.temporal?.games || []).map((game) => [game.game_id, game]));
   const stableRegime = (research.volatility?.regimes || []).find((row) => row.regime === 'stable') || null;
@@ -2363,17 +2528,7 @@ function buildOverview() {
   const scoredGames = state.scored?.games || [];
   const rawCards = scoredGames.map((game) => buildGameCard(game, maps)).filter(Boolean);
 
-  // Align priority signal with Validated Edge: only promote top_bettable cards
-  // confirmed by the decision ledger as WFC or Supportive conviction
-  const ledgerIndex = loadTodayLedgerIndex(state.date);
-  const cards = rawCards.map((card) => {
-    if (card.category !== 'top_bettable') return card;
-    const ledgerEntry = ledgerIndex.get(`${card.game_id}|${card.selection_side}`);
-    if (!isValidatedEdge(ledgerEntry)) {
-      return { ...card, category: 'watchlist' };
-    }
-    return card;
-  });
+  const cards = rawCards;
 
   const topBettable = cards.filter((card) => card.category === 'top_bettable').sort((a, b) => b.quant_score - a.quant_score);
   const watchlist = cards.filter((card) => card.category === 'watchlist').sort((a, b) => b.edge_pct_points - a.edge_pct_points);
@@ -2642,11 +2797,7 @@ function getHistoricalOdds(date, gameId, side) {
 
 function buildModelAnalysis() {
   const allRows = loadHistoricalOutcomeRows();
-  const VALIDATED = r =>
-    r.action === 'Validated Edge' ||
-    r.action === 'Wait for Confirmation' ||
-    r.conviction_tier === 'Supportive';
-  const veRows = allRows.filter(VALIDATED);
+  const veRows = allRows.filter(isValidatedEdgeSignal);
   const signals = veRows
     .filter(r => r.win_loss !== null)
     .sort((a, b) => a.date.localeCompare(b.date) || (a.snapshot_label || '').localeCompare(b.snapshot_label || ''));
@@ -2747,7 +2898,7 @@ function buildModelAnalysis() {
 
   return {
     generated_at: new Date().toISOString(),
-    signal_universe: 'Validated Edge (action=Validated Edge | WFC legacy | conviction_tier=Supportive)',
+    signal_universe: 'Validated Edge (signal_classification=Validated Edge | WFC legacy | Supportive legacy | governed positive-edge Watchlist)',
     total_signals: n,
     wins,
     losses: n - wins,
@@ -2765,6 +2916,7 @@ function buildModelAnalysis() {
 module.exports = {
   buildDecisionPanel,
   buildDecisionLedgerStatus,
+  buildHistoricalSelections,
   buildLearningObservability,
   buildModelAnalysis,
   buildOverview,
@@ -2773,6 +2925,8 @@ module.exports = {
   gameDetail,
   listSnapshots,
   rawArtifact,
+  isValidatedEdgeSignal,
+  signalClassification,
   loadCoreState,
   ROOT,
   OPS_ROOT,

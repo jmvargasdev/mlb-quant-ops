@@ -128,7 +128,7 @@
         },
         "action": {
           "type": "string",
-          "enum": ["Execute Now", "Reduced Quality", "Wait for Confirmation", "Pass"]
+          "enum": ["Validated Edge", "Watchlist", "Pass", "Execute Now", "Reduced Quality", "Wait for Confirmation"]
         },
         "raw_exposure": {
           "type": "string",

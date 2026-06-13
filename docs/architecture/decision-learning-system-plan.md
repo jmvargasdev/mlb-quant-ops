@@ -33,6 +33,13 @@ For the system to improve, every decision must become auditable memory. The plat
 
 This requires contracts, durable decision records, centralized policy gates, explicit decision traces, and outcome attribution.
 
+The ledger must preserve the distinction between signal truth and capital governance:
+
+- `signal_classification` answers whether the row belongs to the empirically validated learning universe.
+- `exposure_governance` answers whether the row was deployable, monitor-only, or blocked for capital.
+
+Accuracy and ROI studies should use `signal_classification`. Capital deployment reviews should use `action`, `executive_exposure`, and `exposure_governance`.
+
 ## Target Architecture
 
 The target architecture combines selected patterns from durable workflow systems, decision graphs, policy engines, contract-first data validation, and event sourcing.
@@ -95,14 +102,23 @@ game_id
 team
 side
 action
+signal_classification
+exposure_governance
 executive_exposure
 raw_exposure
 conviction_tier
 reason
 reason_codes
+fair_probability
+market_probability
+edge_pct_points
+quant_score
 timing_quality_score
 persistence_score
 volatility_score
+validation_bucket
+lifecycle
+policy_gates
 market_regime
 portfolio_risk
 source_signature
@@ -120,6 +136,7 @@ Purpose:
 - preserve what the system believed at decision time
 - enable postmortem analysis
 - prevent silent mutation of historical decisions
+- keep validated-edge accuracy independent from exposure governance downgrades
 
 ### Phase 2: Contract Validation
 

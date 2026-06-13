@@ -3,7 +3,7 @@ import MetricTile from '../../components/MetricTile';
 import ModelAnalysisAccordion from './ModelAnalysisAccordion';
 import PanelFrame from '../../shared/components/PanelFrame';
 import SignalPill from '../../shared/components/SignalPill';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fmt, pct, timeAgo, timestampFull } from '../../shared/lib/formatters';
 import { useLanguage } from '../../shared/i18n/LanguageProvider';
 import { HOME_MOCK_DASHBOARD } from './homeMockData';
@@ -42,8 +42,15 @@ export default function HomeWorkspace({ overview, status, onNavigate }) {
   const unitAssumptionPct = performance.unit_assumption_pct ?? 2;
   const methodNote = t('home.methodNote').replace('{unit}', pct(unitAssumptionPct, 0));
   const performanceWindows = performance.performance_windows || [];
-  const [selectedWindowKey, setSelectedWindowKey] = useState(performanceWindows[1]?.key || performanceWindows[0]?.key || '30d');
+  const [selectedWindowKey, setSelectedWindowKey] = useState(null);
   const selectedWindow = performanceWindows.find((window) => window.key === selectedWindowKey) || performanceWindows[0] || null;
+
+  useEffect(() => {
+    if (!performanceWindows.length) return;
+    if (!selectedWindowKey || !performanceWindows.some((window) => window.key === selectedWindowKey)) {
+      setSelectedWindowKey(performanceWindows[0].key);
+    }
+  }, [performanceWindows, selectedWindowKey]);
 
   const performanceTiles = [
     {

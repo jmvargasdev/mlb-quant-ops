@@ -53,7 +53,16 @@ Cap 10% selected as the reference sizing: captures the bulk of the Kelly distrib
 
 ## Decision
 
-Replace the four-action ontology with a three-action ontology grounded in observed signal performance:
+Replace the four-action ontology with a three-action ontology grounded in observed signal performance.
+
+The system now separates two concepts that were previously conflated:
+
+| Concept | Meaning |
+|---|---|
+| `signal_classification` | Statistical class used for accuracy, ROI, backtest continuity, and learning attribution |
+| `exposure_governance` | Capital deployment state used for staking, monitoring, and risk control |
+
+This distinction is mandatory. A signal can be classified as `Validated Edge` for learning/accuracy while being governed as `monitor_only` for capital deployment.
 
 ### New ontology
 
@@ -62,6 +71,19 @@ Replace the four-action ontology with a three-action ontology grounded in observ
 | **Validated Edge** | Positive Kelly edge AND lifecycle not collapsing AND volatility < 14 | Q-Kelly cap 10% of bankroll |
 | **Watchlist** | Has edge but volatility ≥ 14 OR restricted aggression state | Monitor only — no capital |
 | **Pass** | No Kelly edge OR collapsing lifecycle OR rejected validation | No action |
+
+### Accuracy universe
+
+`Validated Edge` accuracy is the empirically validated signal universe:
+
+- current `signal_classification = Validated Edge`
+- legacy `action = Wait for Confirmation`
+- legacy `conviction_tier = Supportive`
+- governed `Watchlist` rows with positive model edge and no blocking signal policy
+
+Governance filters such as high volatility, restricted aggression, stale timing, or portfolio concentration may reduce or remove capital exposure. They must not remove a signal from the `Validated Edge` accuracy sample unless a new backtest explicitly proves that exclusion improves the validated universe.
+
+Blocking signal policies are different from governance policies. `NO_EDGE` and `EDGE_COLLAPSED` can remove a row from the `Validated Edge` universe because they invalidate the signal itself.
 
 ### Policy gate order (`evaluateStructurePolicies`)
 
@@ -89,10 +111,11 @@ Where `p = fair_probability`, `b = 1/market_implied_probability - 1`, `q = 1 - p
 | `backend/data-service.js` | kellyExposure(), isValidatedEdge(), VALIDATED_EDGE filter |
 | `mlb_ops/scripts/notify_local.js` | Alert on Validated Edge |
 | `frontend/src/workspaces/decision-panel/useExecuteNowAlert.js` | Alert on Validated Edge |
+| `mlb_ops/scripts/outcome_attribution_engine.js` | Propagate signal classification and governance state into attributed outcomes |
 
 ### Backward compatibility
 
-Historical records written with the old action names (`Wait for Confirmation`, `Execute Now`, `Supportive` conviction tier) are still counted as Validated Edge in all analytics. No historical data is invalidated. The `buildPerformanceDashboard`, `buildModelAnalysis`, and `loadHistoricalOutcomeRows` functions maintain dual-name recognition.
+Historical records written with the old action names (`Wait for Confirmation`, `Execute Now`, `Supportive` conviction tier) are still readable. `Wait for Confirmation` and `Supportive` remain part of the Validated Edge universe; `Execute Now` is not promoted by name alone because the backtest did not validate it. No historical data is invalidated. The `buildPerformanceDashboard`, `buildModelAnalysis`, and `loadHistoricalOutcomeRows` functions maintain dual-name recognition plus the explicit `signal_classification` field when present.
 
 ---
 

@@ -16,6 +16,7 @@ import DecisionPanelWorkspace from '../workspaces/decision-panel/DecisionPanelWo
 import HomeWorkspace from '../workspaces/home/HomeWorkspace';
 import ResponsibleUseWorkspace from '../workspaces/responsible-use/ResponsibleUseWorkspace';
 import AnalyticsWorkspace from '../workspaces/analytics/AnalyticsWorkspace';
+import HistoricalSelectionsWorkspace from '../workspaces/historical-selections/HistoricalSelectionsWorkspace';
 import { fmt, timeAgo } from '../shared/lib/formatters';
 import { useLanguage } from '../shared/i18n/LanguageProvider';
 import { useAnalyticsTracker } from '../shared/hooks/useAnalyticsTracker';
@@ -40,6 +41,8 @@ function WorkspaceRenderer({ workspaceId, overview, detail, onSelectGame, onChan
       return <ResponsibleUseWorkspace />;
     case 'analytics':
       return <AnalyticsWorkspace />;
+    case 'historical-selections':
+      return <HistoricalSelectionsWorkspace />;
     default:
       return <DecisionPanelWorkspace overview={overview} status={status} active />;
   }
