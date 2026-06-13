@@ -380,7 +380,7 @@ function AllocationActions({ rows, structures, t }) {
                   <td className="border-y border-slate-700/35 px-3 py-3 align-top text-white">{row.executive_exposure || 'n/a'}</td>
                   <td className="border-y border-slate-700/35 px-3 py-3 align-top text-slate-400">{row.raw_exposure || 'n/a'}</td>
                   <td className="border-y border-slate-700/35 px-3 py-3 align-top">
-                    <SignalPill tone={tierTone(row.conviction_tier)}>{tierLabel(row.conviction_tier, t)}</SignalPill>
+                    <SignalPill tone={actionTone(row.action)}>{actionLabel(row.action, t)}</SignalPill>
                   </td>
                   <td className="rounded-r-2xl border-y border-r border-slate-700/35 px-3 py-3 align-top text-slate-300">
                     {row.reason || t('decision.noReason')}
@@ -417,7 +417,7 @@ function EvidenceRows({ structures, t }) {
               <div className="mt-1 text-xs text-slate-400">{row.matchup}</div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <SignalPill tone={tierTone(row.conviction_tier)}>{tierLabel(row.conviction_tier, t)}</SignalPill>
+              <SignalPill tone={actionTone(row.action)}>{actionLabel(row.action, t)}</SignalPill>
               <SignalPill tone={row.exposure === 'Pass' ? 'warning' : 'positive'}>{row.exposure || 'n/a'}</SignalPill>
               {row.lifecycle && <SignalPill tone={row.lifecycle === 'collapsing' ? 'danger' : row.lifecycle === 'strengthening' ? 'positive' : 'info'}>{row.lifecycle}</SignalPill>}
             </div>
@@ -534,7 +534,7 @@ export default function DecisionPanelWorkspace({ overview, status, active }) {
                   <div className="mt-1 flex flex-wrap gap-3">
                     {alertBanner.map((s) => (
                       <span key={`${s.game_id}:${s.side}`} className="text-sm font-semibold text-white">
-                        {s.team} — {s.executive_exposure} · {s.conviction_tier}
+                        {s.team} — {s.executive_exposure} · {actionLabel(s.action, t)}
                       </span>
                     ))}
                   </div>
